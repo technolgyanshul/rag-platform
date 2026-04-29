@@ -4,14 +4,14 @@ Production-style MVP for a traceable multi-agent RAG assistant with citations, a
 
 ## Current Status
 
-Phase 1 scaffold is in place:
-- Monorepo structure
-- FastAPI backend foundation
-- Next.js frontend foundation
-- Health endpoint
-- Environment template
+Phase 8 baseline is complete:
+- Upload and ingest PDF/image/text
+- Query with retrieval + multi-agent orchestration
+- Query history and dashboard metrics
+- Unit and integration tests
+- Evaluation script scaffold and report output
 
-## Planned Stack
+## Stack
 
 - Frontend: Next.js + TypeScript
 - Backend: FastAPI
@@ -19,9 +19,16 @@ Phase 1 scaffold is in place:
 - Orchestration: LangGraph
 - LLMs: Groq (agents), Sarvam (judge)
 
-## Quick Start
+## Setup From Clean Clone
 
-### Backend
+Copy environment templates and fill values:
+
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env.local
+```
+
+### 1) Backend
 
 ```bash
 cd backend
@@ -31,9 +38,13 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-Health check: `GET http://localhost:8000/health`
+Backend health check:
 
-### Frontend
+```bash
+curl http://localhost:8000/health
+```
+
+### 2) Frontend
 
 ```bash
 cd frontend
@@ -43,16 +54,53 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-## Phase 1 Deliverables
+## Test Commands
 
-- [x] Running frontend scaffold
-- [x] Running backend scaffold
-- [x] Health endpoint scaffold
-- [x] Initial README
+```bash
+# backend
+cd backend
+pytest
 
-## Next Implementation Focus
+# frontend
+cd frontend
+npm test
+npm run build
 
-1. Supabase schema + RLS
-2. Auth pages with Supabase
-3. Ingestion pipeline (`/ingest`)
-4. Retrieval + multi-agent query flow (`/query`)
+# evaluation scaffold
+cd ..
+python backend/tests/evaluation/run_eval.py
+```
+
+## API Routes
+
+- `GET /health`
+- `POST /ingest`
+- `GET /ingest/documents`
+- `POST /query`
+- `GET /query/history`
+- `GET /dashboard/metrics`
+
+## Documentation
+
+- `docs/ARCHITECTURE.md`
+- `docs/TESTING.md`
+- `docs/EVALUATION.md`
+- `docs/PRD-SOW-HANDOFF.md`
+
+## Demo Flow
+
+Follow `docs/DEMO.md` for a complete upload -> query -> trace -> dashboard walkthrough.
+
+## Completed Deliverables
+
+- [x] Full frontend MVP pages
+- [x] Multi-agent query orchestration and persistence
+- [x] Dashboard and query history endpoints
+- [x] Unit/integration/failure-path tests
+- [x] Evaluation scaffold and generated report
+
+## Next Iteration
+
+1. Replace evaluation stubs with live `/query` benchmarking
+2. Add richer auth and team-scoped authorization tests
+3. Add CI workflow for backend and frontend checks

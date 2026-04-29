@@ -4,8 +4,9 @@ This directory contains Phase 8 evaluation scaffolding.
 
 ## Files
 
+- `docs/`: sample evaluation documents (placeholder folder)
 - `questions.json`: lightweight evaluation set with expected source labels
-- `run_eval.py`: script that generates a markdown report from questions
+- `run_eval.py`: script that generates baseline vs multi-agent markdown report
 - `results.md`: generated output report
 
 ## Run

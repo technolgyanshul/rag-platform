@@ -5,7 +5,7 @@ import time
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 from db.supabase import SupabaseRepository
@@ -119,7 +119,7 @@ def run_query(payload: QueryRequest) -> QueryResponse:
 
 
 @router.get("/history", response_model=list[QueryHistoryItem])
-def query_history(session_id: str, limit: int = 50) -> list[QueryHistoryItem]:
+def query_history(session_id: str = Query(..., min_length=1), limit: int = Query(50, ge=1, le=200)) -> list[QueryHistoryItem]:
     repository = SupabaseRepository()
     rows = repository.list_queries(session_id=session_id, limit=limit)
     return [QueryHistoryItem(**row) for row in rows]
