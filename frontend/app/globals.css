@@ -1,0 +1,36 @@
+:root {
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --text: #102a43;
+  --muted: #486581;
+  --border: #d9e2ec;
+  --accent: #0f766e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Source Sans 3", "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top right, #e0f2f1, var(--bg));
+  color: var(--text);
+}
+
+a {
+  color: inherit;
+}
+
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
