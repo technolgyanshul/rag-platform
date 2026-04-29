@@ -1,0 +1,20 @@
+[
+  {
+    "id": "q1",
+    "question": "What is the main conclusion of sample_1?",
+    "expected_source": "sample_1.pdf",
+    "difficulty": "easy"
+  },
+  {
+    "id": "q2",
+    "question": "Compare the two major recommendations in sample_2.",
+    "expected_source": "sample_2.pdf",
+    "difficulty": "medium"
+  },
+  {
+    "id": "q3",
+    "question": "What key text is visible in sample_image?",
+    "expected_source": "sample_image.png",
+    "difficulty": "easy"
+  }
+]
