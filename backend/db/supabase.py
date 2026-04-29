@@ -10,6 +10,8 @@ from uuid import uuid4
 class SupabaseRepository:
     _memory_documents: list[dict[str, Any]] = []
     _memory_chunks: list[dict[str, Any]] = []
+    _memory_queries: list[dict[str, Any]] = []
+    _memory_agent_traces: list[dict[str, Any]] = []
 
     def __init__(self) -> None:
         self._client = None
@@ -109,6 +111,66 @@ class SupabaseRepository:
 
         scored_rows.sort(key=lambda row: row["similarity"], reverse=True)
         return scored_rows[:top_k]
+
+    def save_query(
+        self,
+        session_id: str,
+        query_text: str,
+        final_answer: str,
+        scorecard: dict[str, Any],
+        response_time_ms: int,
+    ) -> dict[str, Any]:
+        payload = {
+            "id": str(uuid4()),
+            "session_id": session_id,
+            "query_text": query_text,
+            "final_answer": final_answer,
+            "overall_score": scorecard.get("overall"),
+            "citation_accuracy": scorecard.get("citation_accuracy"),
+            "insight_depth": scorecard.get("insight_depth"),
+            "response_time_ms": response_time_ms,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        if self._client:
+            result = self._client.table("queries").insert(
+                {
+                    "session_id": session_id,
+                    "query_text": query_text,
+                    "final_answer": final_answer,
+                    "overall_score": scorecard.get("overall"),
+                    "citation_accuracy": scorecard.get("citation_accuracy"),
+                    "insight_depth": scorecard.get("insight_depth"),
+                    "response_time_ms": response_time_ms,
+                }
+            ).execute()
+            if result.data:
+                return result.data[0]
+
+        self._memory_queries.append(payload)
+        return payload
+
+    def save_agent_traces(self, query_id: str, traces: list[dict[str, Any]]) -> None:
+        rows = [
+            {
+                "query_id": query_id,
+                "agent_name": trace.get("agent_name", ""),
+                "model_name": trace.get("model_name", ""),
+                "input_summary": trace.get("input_summary", ""),
+                "output": trace.get("output", ""),
+                "response_time_ms": trace.get("response_time_ms", 0),
+                "metadata": trace.get("metadata", {}),
+            }
+            for trace in traces
+        ]
+
+        if self._client:
+            self._client.table("agent_traces").insert(rows).execute()
+            return
+
+        for row in rows:
+            memory_row = {"id": str(uuid4()), **row, "created_at": datetime.now(timezone.utc).isoformat()}
+            self._memory_agent_traces.append(memory_row)
 
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:

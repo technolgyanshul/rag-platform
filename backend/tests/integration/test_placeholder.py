@@ -26,6 +26,7 @@ def test_query_returns_top_k_sources() -> None:
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["query_id"]
     assert payload["insufficient_context"] is False
     assert payload["retrieval_count"] == 1
     assert payload["sources"][0]["filename"] == "report.txt"
@@ -46,6 +47,7 @@ def test_query_returns_insufficient_context_when_no_hits() -> None:
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["query_id"] is None
     assert payload["insufficient_context"] is True
     assert payload["retrieval_count"] == 0
     assert payload["sources"] == []
