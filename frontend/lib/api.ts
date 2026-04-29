@@ -1,3 +1,5 @@
+import { DashboardMetrics, QueryHistoryItem, QueryResponse } from "./types";
+
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 export type IngestResponse = {
@@ -39,6 +41,46 @@ export async function listKnowledgeDocuments(teamId: string): Promise<DocumentRo
   const response = await fetch(`${API_BASE_URL}/ingest/documents?team_id=${encodeURIComponent(teamId)}`);
   if (!response.ok) {
     throw new Error("Could not load documents");
+  }
+  return response.json();
+}
+
+export async function runQuery(payload: {
+  query: string;
+  team_id: string;
+  session_id: string;
+  top_k?: number;
+}): Promise<QueryResponse> {
+  const response = await fetch(`${API_BASE_URL}/query`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.detail ?? "Query failed");
+  }
+
+  return response.json();
+}
+
+export async function listQueryHistory(sessionId: string, limit = 50): Promise<QueryHistoryItem[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/query/history?session_id=${encodeURIComponent(sessionId)}&limit=${limit}`,
+  );
+  if (!response.ok) {
+    throw new Error("Could not load history");
+  }
+  return response.json();
+}
+
+export async function getDashboardMetrics(sessionId: string, days = 7): Promise<DashboardMetrics> {
+  const response = await fetch(
+    `${API_BASE_URL}/dashboard/metrics?session_id=${encodeURIComponent(sessionId)}&days=${days}`,
+  );
+  if (!response.ok) {
+    throw new Error("Could not load dashboard metrics");
   }
   return response.json();
 }

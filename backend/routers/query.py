@@ -35,6 +35,18 @@ class QueryResponse(BaseModel):
     insufficient_context: bool
 
 
+class QueryHistoryItem(BaseModel):
+    id: str
+    session_id: str
+    query_text: str
+    final_answer: str
+    overall_score: float | None = None
+    citation_accuracy: float | None = None
+    insight_depth: float | None = None
+    response_time_ms: int | None = None
+    created_at: str
+
+
 @router.post("", response_model=QueryResponse)
 def run_query(payload: QueryRequest) -> QueryResponse:
     request_id = str(uuid4())
@@ -104,3 +116,10 @@ def run_query(payload: QueryRequest) -> QueryResponse:
         retrieval_count=len(sources),
         insufficient_context=False,
     )
+
+
+@router.get("/history", response_model=list[QueryHistoryItem])
+def query_history(session_id: str, limit: int = 50) -> list[QueryHistoryItem]:
+    repository = SupabaseRepository()
+    rows = repository.list_queries(session_id=session_id, limit=limit)
+    return [QueryHistoryItem(**row) for row in rows]

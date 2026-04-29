@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import math
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -197,6 +197,57 @@ class SupabaseRepository:
         for row in rows:
             memory_row = {"id": str(uuid4()), **row, "created_at": datetime.now(timezone.utc).isoformat()}
             self._memory_agent_traces.append(memory_row)
+
+    def list_queries(self, session_id: str, limit: int = 50) -> list[dict[str, Any]]:
+        if self._client:
+            try:
+                result = (
+                    self._client.table("queries")
+                    .select("*")
+                    .eq("session_id", session_id)
+                    .order("created_at", desc=True)
+                    .limit(limit)
+                    .execute()
+                )
+                return result.data or []
+            except Exception as exc:
+                logger.exception("Failed to list queries from Supabase, falling back to in-memory", extra={"error": str(exc)})
+
+        rows = [row for row in self._memory_queries if row.get("session_id") == session_id]
+        rows.sort(key=lambda item: item.get("created_at", ""), reverse=True)
+        return rows[:limit]
+
+    def list_dashboard_metrics(self, session_id: str, days: int = 7) -> dict[str, Any]:
+        rows = self.list_queries(session_id=session_id, limit=500)
+        total_queries = len(rows)
+        avg_response_ms = int(sum(int(row.get("response_time_ms", 0)) for row in rows) / total_queries) if total_queries else 0
+        avg_overall_score = (
+            round(sum(float(row.get("overall_score", 0.0) or 0.0) for row in rows) / total_queries, 2) if total_queries else 0.0
+        )
+
+        now = datetime.now(timezone.utc)
+        per_day: dict[str, int] = {}
+        for day_offset in range(days - 1, -1, -1):
+            day = now.date() - timedelta(days=day_offset)
+            per_day[day.isoformat()] = 0
+
+        for row in rows:
+            created_at = row.get("created_at")
+            if not created_at:
+                continue
+            try:
+                day_key = datetime.fromisoformat(str(created_at).replace("Z", "+00:00")).date().isoformat()
+            except ValueError:
+                continue
+            if day_key in per_day:
+                per_day[day_key] += 1
+
+        return {
+            "total_queries": total_queries,
+            "average_response_time_ms": avg_response_ms,
+            "average_overall_score": avg_overall_score,
+            "queries_over_time": [{"date": day, "count": count} for day, count in per_day.items()],
+        }
 
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:

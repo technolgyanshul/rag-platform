@@ -28,6 +28,11 @@ a {
   padding: 24px;
 }
 
+.page-stack {
+  display: grid;
+  gap: 16px;
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -51,6 +56,13 @@ a {
   padding: 10px;
 }
 
+.auth-form textarea {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  resize: vertical;
+}
+
 button {
   border: 0;
   border-radius: 8px;
@@ -67,4 +79,76 @@ button:disabled {
 
 .status-message {
   color: var(--muted);
+}
+
+.source-list,
+.trace-list,
+.history-list {
+  display: grid;
+  gap: 10px;
+  padding-left: 18px;
+}
+
+.source-item,
+.trace-item,
+.history-item {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.score-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.metric-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.metric-card h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.metric-card p {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.chart-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.chart-row {
+  display: grid;
+  grid-template-columns: 100px 1fr 40px;
+  align-items: center;
+  gap: 8px;
+}
+
+.chart-bar-wrap {
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+  height: 12px;
+}
+
+.chart-bar {
+  background: #0f766e;
+  height: 100%;
+  min-width: 2px;
 }
