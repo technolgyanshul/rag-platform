@@ -18,15 +18,20 @@ export default function LoginPage() {
     setLoading(true);
     setMessage("");
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setMessage(error.message);
+        setLoading(false);
+        return;
+      }
 
-    if (error) {
-      setMessage(error.message);
+      router.push("/profile");
+    } catch {
+      setMessage("Login failed due to a network or server error.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    router.push("/profile");
   };
 
   return (

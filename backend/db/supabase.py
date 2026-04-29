@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
 import math
 import os
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
+
+
+logger = logging.getLogger(__name__)
 
 
 class SupabaseRepository:
@@ -22,7 +26,11 @@ class SupabaseRepository:
                 from supabase import create_client
 
                 self._client = create_client(url, key)
-            except Exception:
+            except ImportError as exc:
+                logger.warning("Supabase SDK unavailable, using in-memory repository", extra={"error": str(exc)})
+                self._client = None
+            except Exception as exc:
+                logger.exception("Supabase client initialization failed, using in-memory repository", extra={"error": str(exc)})
                 self._client = None
 
     def insert_document(self, team_id: str, filename: str, file_type: str, chunk_count: int) -> dict[str, Any]:
@@ -36,16 +44,19 @@ class SupabaseRepository:
         }
 
         if self._client:
-            result = self._client.table("documents").insert(
-                {
-                    "team_id": team_id,
-                    "filename": filename,
-                    "file_type": file_type,
-                    "chunk_count": chunk_count,
-                }
-            ).execute()
-            if result.data:
-                return result.data[0]
+            try:
+                result = self._client.table("documents").insert(
+                    {
+                        "team_id": team_id,
+                        "filename": filename,
+                        "file_type": file_type,
+                        "chunk_count": chunk_count,
+                    }
+                ).execute()
+                if result.data:
+                    return result.data[0]
+            except Exception as exc:
+                logger.exception("Failed to insert document in Supabase, falling back to in-memory", extra={"error": str(exc)})
 
         self._memory_documents.append(payload)
         return payload
@@ -63,8 +74,11 @@ class SupabaseRepository:
         ]
 
         if self._client:
-            self._client.table("chunks").insert(rows).execute()
-            return
+            try:
+                self._client.table("chunks").insert(rows).execute()
+                return
+            except Exception as exc:
+                logger.exception("Failed to insert chunks in Supabase, falling back to in-memory", extra={"error": str(exc)})
 
         for row in rows:
             memory_row = {"id": str(uuid4()), **row, "created_at": datetime.now(timezone.utc).isoformat()}
@@ -72,23 +86,29 @@ class SupabaseRepository:
 
     def list_documents(self, team_id: str) -> list[dict[str, Any]]:
         if self._client:
-            result = self._client.table("documents").select("*").eq("team_id", team_id).order("uploaded_at", desc=True).execute()
-            return result.data or []
+            try:
+                result = self._client.table("documents").select("*").eq("team_id", team_id).order("uploaded_at", desc=True).execute()
+                return result.data or []
+            except Exception as exc:
+                logger.exception("Failed to list documents from Supabase, falling back to in-memory", extra={"error": str(exc)})
 
         docs = [doc for doc in self._memory_documents if doc["team_id"] == team_id]
         return sorted(docs, key=lambda item: item["uploaded_at"], reverse=True)
 
     def search_chunks(self, team_id: str, query_embedding: list[float], top_k: int = 5) -> list[dict[str, Any]]:
         if self._client:
-            result = self._client.rpc(
-                "match_chunks",
-                {
-                    "query_embedding": query_embedding,
-                    "filter_team_id": team_id,
-                    "match_count": top_k,
-                },
-            ).execute()
-            return result.data or []
+            try:
+                result = self._client.rpc(
+                    "match_chunks",
+                    {
+                        "query_embedding": query_embedding,
+                        "filter_team_id": team_id,
+                        "match_count": top_k,
+                    },
+                ).execute()
+                return result.data or []
+            except Exception as exc:
+                logger.exception("Failed to search chunks in Supabase, falling back to in-memory", extra={"error": str(exc)})
 
         document_map = {document["id"]: document for document in self._memory_documents if document["team_id"] == team_id}
         scored_rows: list[dict[str, Any]] = []
@@ -133,19 +153,22 @@ class SupabaseRepository:
         }
 
         if self._client:
-            result = self._client.table("queries").insert(
-                {
-                    "session_id": session_id,
-                    "query_text": query_text,
-                    "final_answer": final_answer,
-                    "overall_score": scorecard.get("overall"),
-                    "citation_accuracy": scorecard.get("citation_accuracy"),
-                    "insight_depth": scorecard.get("insight_depth"),
-                    "response_time_ms": response_time_ms,
-                }
-            ).execute()
-            if result.data:
-                return result.data[0]
+            try:
+                result = self._client.table("queries").insert(
+                    {
+                        "session_id": session_id,
+                        "query_text": query_text,
+                        "final_answer": final_answer,
+                        "overall_score": scorecard.get("overall"),
+                        "citation_accuracy": scorecard.get("citation_accuracy"),
+                        "insight_depth": scorecard.get("insight_depth"),
+                        "response_time_ms": response_time_ms,
+                    }
+                ).execute()
+                if result.data:
+                    return result.data[0]
+            except Exception as exc:
+                logger.exception("Failed to save query in Supabase, falling back to in-memory", extra={"error": str(exc)})
 
         self._memory_queries.append(payload)
         return payload
@@ -165,8 +188,11 @@ class SupabaseRepository:
         ]
 
         if self._client:
-            self._client.table("agent_traces").insert(rows).execute()
-            return
+            try:
+                self._client.table("agent_traces").insert(rows).execute()
+                return
+            except Exception as exc:
+                logger.exception("Failed to save agent traces in Supabase, falling back to in-memory", extra={"error": str(exc)})
 
         for row in rows:
             memory_row = {"id": str(uuid4()), **row, "created_at": datetime.now(timezone.utc).isoformat()}

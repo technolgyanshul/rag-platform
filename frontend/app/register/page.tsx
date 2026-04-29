@@ -18,17 +18,21 @@ export default function RegisterPage() {
     setLoading(true);
     setMessage("");
 
-    const { error } = await supabase.auth.signUp({ email, password });
+    try {
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        setMessage(error.message);
+        setLoading(false);
+        return;
+      }
 
-    if (error) {
-      setMessage(error.message);
+      setMessage("Registration successful. You can now sign in.");
+      router.push("/login");
+    } catch {
+      setMessage("Registration failed due to a network or server error.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setMessage("Registration successful. You can now sign in.");
-    setLoading(false);
-    router.push("/login");
   };
 
   return (

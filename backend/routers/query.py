@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any
+from uuid import uuid4
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
@@ -12,6 +14,7 @@ from rag.retriever import format_sources, retrieve_chunks
 
 
 router = APIRouter(prefix="/query", tags=["query"])
+logger = logging.getLogger(__name__)
 
 
 class QueryRequest(BaseModel):
@@ -34,11 +37,26 @@ class QueryResponse(BaseModel):
 
 @router.post("", response_model=QueryResponse)
 def run_query(payload: QueryRequest) -> QueryResponse:
+    request_id = str(uuid4())
     query_start = time.perf_counter()
+    logger.info(
+        "query_request_started",
+        extra={"request_id": request_id, "team_id": payload.team_id, "session_id": payload.session_id, "top_k": payload.top_k},
+    )
     rows = retrieve_chunks(query=payload.query, team_id=payload.team_id, top_k=payload.top_k)
     sources = format_sources(rows)
 
     if not sources:
+        logger.info(
+            "query_request_no_sources",
+            extra={
+                "request_id": request_id,
+                "team_id": payload.team_id,
+                "session_id": payload.session_id,
+                "retrieval_count": 0,
+                "latency_ms": int((time.perf_counter() - query_start) * 1000),
+            },
+        )
         return QueryResponse(
             query=payload.query,
             final_answer=(
@@ -63,6 +81,18 @@ def run_query(payload: QueryRequest) -> QueryResponse:
         response_time_ms=total_response_ms,
     )
     repository.save_agent_traces(query_id=query_row["id"], traces=graph_result["agent_trace"])
+
+    logger.info(
+        "query_request_completed",
+        extra={
+            "request_id": request_id,
+            "query_id": query_row["id"],
+            "team_id": payload.team_id,
+            "session_id": payload.session_id,
+            "retrieval_count": len(sources),
+            "latency_ms": total_response_ms,
+        },
+    )
 
     return QueryResponse(
         query_id=query_row["id"],

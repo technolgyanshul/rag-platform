@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import logging
 import os
+
+
+logger = logging.getLogger(__name__)
 
 
 class SarvamClient:
@@ -26,8 +30,16 @@ class SarvamClient:
                         "insight_depth": float(payload.get("insight_depth", 0)),
                         "reasoning": str(payload.get("reasoning", "")),
                     }
-            except Exception:
-                pass
+                logger.warning(
+                    "Sarvam judge returned non-OK response, using fallback score",
+                    extra={"status_code": response.status_code},
+                )
+            except ImportError as exc:
+                logger.warning("Requests SDK unavailable, using fallback score", extra={"error": str(exc)})
+            except requests.RequestException as exc:
+                logger.exception("Sarvam judge request failed, using fallback score", extra={"error": str(exc)})
+            except (TypeError, ValueError, KeyError) as exc:
+                logger.exception("Sarvam judge response parse failed, using fallback score", extra={"error": str(exc)})
 
         citation_accuracy = 8.0 if sources else 3.0
         insight_depth = 7.0 if len(answer) > 80 else 5.0

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 
 
@@ -9,6 +10,7 @@ DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 EMBEDDING_DIMENSION = 384
 _embedding_model = None
+logger = logging.getLogger(__name__)
 
 
 def _get_embedding_model():
@@ -21,7 +23,11 @@ def _get_embedding_model():
 
         model_name = os.getenv("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
         _embedding_model = SentenceTransformer(model_name)
-    except Exception:
+    except ImportError as exc:
+        logger.warning("sentence-transformers not installed, using hash embeddings", extra={"error": str(exc)})
+        _embedding_model = False
+    except Exception as exc:
+        logger.exception("Embedding model initialization failed, using hash embeddings", extra={"error": str(exc)})
         _embedding_model = False
 
     return _embedding_model
@@ -46,9 +52,16 @@ def _hash_embed_text(text: str) -> list[float]:
 def embed_text(text: str) -> list[float]:
     model = _get_embedding_model()
     if model:
-        vector = model.encode(text or "", normalize_embeddings=True).tolist()
-        if len(vector) == EMBEDDING_DIMENSION:
-            return vector
+        try:
+            vector = model.encode(text or "", normalize_embeddings=True).tolist()
+            if len(vector) == EMBEDDING_DIMENSION:
+                return vector
+            logger.warning(
+                "Unexpected embedding dimension, using hash fallback",
+                extra={"expected": EMBEDDING_DIMENSION, "actual": len(vector)},
+            )
+        except Exception as exc:
+            logger.exception("Embedding generation failed, using hash fallback", extra={"error": str(exc)})
     return _hash_embed_text(text)
 
 
