@@ -22,3 +22,6 @@ backend/.venv/
 !**/.env.example
 backend/.env
 frontend/.env.local
+
+# Generated analysis artifacts
+/graphify-out/

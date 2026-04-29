@@ -1,3 +1,11 @@
+"use client";
+
+import { ProtectedPage } from "../../components/auth/ProtectedPage";
+
 export default function ChatPage() {
-  return <main className="container">Chat page scaffold</main>;
+  return (
+    <ProtectedPage>
+      <main className="container">Chat page scaffold</main>
+    </ProtectedPage>
+  );
 }

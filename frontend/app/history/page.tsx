@@ -1,3 +1,11 @@
+"use client";
+
+import { ProtectedPage } from "../../components/auth/ProtectedPage";
+
 export default function HistoryPage() {
-  return <main className="container">History page scaffold</main>;
+  return (
+    <ProtectedPage>
+      <main className="container">History page scaffold</main>
+    </ProtectedPage>
+  );
 }
