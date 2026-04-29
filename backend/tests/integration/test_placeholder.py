@@ -30,6 +30,12 @@ def test_query_returns_top_k_sources() -> None:
     assert payload["retrieval_count"] == 1
     assert payload["sources"][0]["filename"] == "report.txt"
     assert "chunk_index" in payload["sources"][0]
+    assert payload["scorecard"] is not None
+    assert {row["agent_name"] for row in payload["agent_trace"]} == {"Researcher", "Critic", "Synthesizer", "Judge"}
+    assert payload["agent_trace"][0]["agent_name"] == "Researcher"
+    assert payload["agent_trace"][1]["agent_name"] == "Critic"
+    assert payload["agent_trace"][2]["agent_name"] == "Synthesizer"
+    assert payload["agent_trace"][3]["agent_name"] == "Judge"
 
 
 def test_query_returns_insufficient_context_when_no_hits() -> None:
@@ -43,3 +49,4 @@ def test_query_returns_insufficient_context_when_no_hits() -> None:
     assert payload["insufficient_context"] is True
     assert payload["retrieval_count"] == 0
     assert payload["sources"] == []
+    assert payload["agent_trace"] == []

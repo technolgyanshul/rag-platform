@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from orchestration.graph import run_graph
 from rag.retriever import format_sources, retrieve_chunks
 
 
@@ -22,6 +23,8 @@ class QueryResponse(BaseModel):
     query: str
     final_answer: str
     sources: list[dict[str, Any]]
+    scorecard: dict[str, Any] | None = None
+    agent_trace: list[dict[str, Any]] = Field(default_factory=list)
     retrieval_count: int
     insufficient_context: bool
 
@@ -39,15 +42,19 @@ def run_query(payload: QueryRequest) -> QueryResponse:
                 "Please upload more relevant files or rephrase the query."
             ),
             sources=[],
+            scorecard=None,
+            agent_trace=[],
             retrieval_count=0,
             insufficient_context=True,
         )
 
-    top_sources = ", ".join(f"{source['filename']}#chunk-{source['chunk_index']}" for source in sources[:3])
+    graph_result = run_graph(query=payload.query, sources=sources)
     return QueryResponse(
         query=payload.query,
-        final_answer=f"Retrieved relevant evidence from: {top_sources}.",
+        final_answer=graph_result["final_answer"],
         sources=sources,
+        scorecard=graph_result["scorecard"],
+        agent_trace=graph_result["agent_trace"],
         retrieval_count=len(sources),
         insufficient_context=False,
     )
