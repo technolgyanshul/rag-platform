@@ -28,8 +28,10 @@ export function ProtectedPage({ children }: ProtectedPageProps) {
 
   if (loading) {
     return (
-      <main className="container">
-        <p>Checking your session...</p>
+      <main className="auth-page">
+        <div className="card auth-card">
+          <p className="status-message">Checking your session...</p>
+        </div>
       </main>
     );
   }
