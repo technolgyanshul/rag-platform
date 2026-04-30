@@ -72,6 +72,16 @@ create table if not exists agent_traces (
   created_at timestamptz default now()
 );
 
+create table if not exists session_logs (
+  id uuid primary key default gen_random_uuid(),
+  session_id text not null,
+  team_id text not null,
+  event_type text not null,
+  request_id text,
+  payload jsonb default '{}',
+  created_at timestamptz default now()
+);
+
 create index if not exists chunks_embedding_idx
 on chunks
 using ivfflat (embedding vector_cosine_ops)
@@ -85,6 +95,9 @@ create index if not exists sessions_user_id_idx on sessions(user_id);
 create index if not exists sessions_team_id_idx on sessions(team_id);
 create index if not exists queries_session_id_idx on queries(session_id);
 create index if not exists agent_traces_query_id_idx on agent_traces(query_id);
+create index if not exists session_logs_session_id_idx on session_logs(session_id);
+create index if not exists session_logs_team_id_idx on session_logs(team_id);
+create index if not exists session_logs_created_at_idx on session_logs(created_at desc);
 
 alter table teams enable row level security;
 alter table agents enable row level security;
