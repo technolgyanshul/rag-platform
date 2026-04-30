@@ -70,7 +70,7 @@ export default function HistoryPage() {
                       <td>{row.query_text}</td>
                       <td>{row.final_answer.slice(0, 140)}...</td>
                       <td>{row.overall_score ?? "N/A"}</td>
-                      <td>{row.response_time_ms ? `${row.response_time_ms} ms` : "N/A"}</td>
+                      <td>{row.response_time_ms != null ? `${row.response_time_ms} ms` : "N/A"}</td>
                       <td>{new Date(row.created_at).toLocaleString()}</td>
                     </tr>
                   ))}

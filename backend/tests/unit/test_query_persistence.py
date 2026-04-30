@@ -4,6 +4,7 @@ from db.supabase import SupabaseRepository
 def test_save_query_and_trace_in_memory() -> None:
     repository = SupabaseRepository()
     query_row = repository.save_query(
+        user_id="00000000-0000-0000-0000-000000000001",
         session_id="session-1",
         query_text="What is the summary?",
         final_answer="Answer text",

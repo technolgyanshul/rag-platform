@@ -15,7 +15,7 @@ npm run dev
 
 ## 2. Upload a document
 
-Open `http://localhost:3000/upload` and upload a sample PDF, image, or text file.
+Open `http://localhost:3000/knowledge` and upload a sample PDF, image, or text file.
 
 Expected outcome:
 

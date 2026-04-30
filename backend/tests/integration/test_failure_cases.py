@@ -9,7 +9,7 @@ client = TestClient(app)
 def test_ingest_rejects_unsupported_file_type() -> None:
     response = client.post(
         "/ingest",
-        data={"team_id": "phase8-team"},
+        data={"team_id": "99999999-9999-9999-9999-999999999999"},
         files={"file": ("notes.md", b"hello", "text/markdown")},
     )
 
@@ -20,7 +20,7 @@ def test_ingest_rejects_unsupported_file_type() -> None:
 def test_ingest_rejects_empty_payload() -> None:
     response = client.post(
         "/ingest",
-        data={"team_id": "phase8-team"},
+        data={"team_id": "99999999-9999-9999-9999-999999999999"},
         files={"file": ("empty.txt", b"", "text/plain")},
     )
 

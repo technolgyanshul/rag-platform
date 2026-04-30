@@ -1,6 +1,20 @@
 import { DashboardMetrics, QueryHistoryItem, QueryResponse } from "./types";
+import { supabase } from "./supabase";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
+async function buildAuthHeaders(base?: HeadersInit): Promise<HeadersInit> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error("You must be signed in to call the API");
+  }
+  return {
+    ...(base ?? {}),
+    Authorization: `Bearer ${session.access_token}`,
+  };
+}
 
 export type IngestResponse = {
   document_id: string;
@@ -25,6 +39,7 @@ export async function uploadKnowledgeFile(teamId: string, file: File): Promise<I
 
   const response = await fetch(`${API_BASE_URL}/ingest`, {
     method: "POST",
+    headers: await buildAuthHeaders(),
     body: formData,
   });
 
@@ -38,7 +53,9 @@ export async function uploadKnowledgeFile(teamId: string, file: File): Promise<I
 }
 
 export async function listKnowledgeDocuments(teamId: string): Promise<DocumentRow[]> {
-  const response = await fetch(`${API_BASE_URL}/ingest/documents?team_id=${encodeURIComponent(teamId)}`);
+  const response = await fetch(`${API_BASE_URL}/ingest/documents?team_id=${encodeURIComponent(teamId)}`, {
+    headers: await buildAuthHeaders(),
+  });
   if (!response.ok) {
     throw new Error("Could not load documents");
   }
@@ -53,7 +70,7 @@ export async function runQuery(payload: {
 }): Promise<QueryResponse> {
   const response = await fetch(`${API_BASE_URL}/query`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(payload),
   });
 
@@ -68,6 +85,7 @@ export async function runQuery(payload: {
 export async function listQueryHistory(sessionId: string, limit = 50): Promise<QueryHistoryItem[]> {
   const response = await fetch(
     `${API_BASE_URL}/query/history?session_id=${encodeURIComponent(sessionId)}&limit=${limit}`,
+    { headers: await buildAuthHeaders() },
   );
   if (!response.ok) {
     throw new Error("Could not load history");
@@ -78,6 +96,7 @@ export async function listQueryHistory(sessionId: string, limit = 50): Promise<Q
 export async function getDashboardMetrics(sessionId: string, days = 7): Promise<DashboardMetrics> {
   const response = await fetch(
     `${API_BASE_URL}/dashboard/metrics?session_id=${encodeURIComponent(sessionId)}&days=${days}`,
+    { headers: await buildAuthHeaders() },
   );
   if (!response.ok) {
     throw new Error("Could not load dashboard metrics");

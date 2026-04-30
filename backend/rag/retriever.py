@@ -7,7 +7,7 @@ from db.supabase import SupabaseRepository
 from rag.embeddings import embed_text
 
 
-def retrieve_chunks(query: str, team_id: str, top_k: int | None = None) -> list[dict[str, Any]]:
+def retrieve_chunks(query: str, team_id: str, user_id: str, top_k: int | None = None) -> list[dict[str, Any]]:
     settings = get_settings()
     if top_k is None:
         top_k = settings.top_k
@@ -20,7 +20,7 @@ def retrieve_chunks(query: str, team_id: str, top_k: int | None = None) -> list[
 
     query_embedding = embed_text(query)
     repository = SupabaseRepository()
-    rows = repository.search_chunks(team_id=team_id, query_embedding=query_embedding, top_k=top_k)
+    rows = repository.search_chunks(user_id=user_id, team_id=team_id, query_embedding=query_embedding, top_k=top_k)
     return rows
 
 

@@ -6,6 +6,7 @@ from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import Response
 
+from core.cors import get_cors_origins
 from core.config import get_settings
 from routers.dashboard import router as dashboard_router
 from routers.health import router as health_router
@@ -26,9 +27,10 @@ configure_logging()
 
 app = FastAPI(title="Multi-Agent RAG Backend", version="0.1.0")
 
+cors_origins = get_cors_origins()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

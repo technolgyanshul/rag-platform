@@ -3,23 +3,31 @@ from __future__ import annotations
 import logging
 import math
 import os
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
-
 logger = logging.getLogger(__name__)
 
 
-class SupabaseRepository:
-    _memory_documents: list[dict[str, Any]] = []
-    _memory_chunks: list[dict[str, Any]] = []
-    _memory_queries: list[dict[str, Any]] = []
-    _memory_agent_traces: list[dict[str, Any]] = []
-    _memory_session_logs: list[dict[str, Any]] = []
+@dataclass
+class _FallbackStore:
+    documents: list[dict[str, Any]] = field(default_factory=list)
+    chunks: list[dict[str, Any]] = field(default_factory=list)
+    queries: list[dict[str, Any]] = field(default_factory=list)
+    agent_traces: list[dict[str, Any]] = field(default_factory=list)
+    session_logs: list[dict[str, Any]] = field(default_factory=list)
 
+
+_FALLBACK = _FallbackStore()
+
+
+class SupabaseRepository:
     def __init__(self) -> None:
         self._client = None
+        self._allow_inmemory = bool(os.getenv("PYTEST_CURRENT_TEST")) or os.getenv("ALLOW_INMEMORY_REPOSITORY", "false").lower() == "true"
+
         url = os.getenv("SUPABASE_URL")
         key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
         if url and key:
@@ -28,13 +36,35 @@ class SupabaseRepository:
 
                 self._client = create_client(url, key)
             except ImportError as exc:
-                logger.warning("Supabase SDK unavailable, using in-memory repository", extra={"error": str(exc)})
-                self._client = None
+                logger.warning("Supabase SDK unavailable", extra={"error": str(exc)})
             except Exception as exc:
-                logger.exception("Supabase client initialization failed, using in-memory repository", extra={"error": str(exc)})
-                self._client = None
+                logger.exception("Supabase client initialization failed", extra={"error": str(exc)})
 
-    def insert_document(self, team_id: str, filename: str, file_type: str, chunk_count: int) -> dict[str, Any]:
+        if self._client is None and not self._allow_inmemory:
+            raise RuntimeError("Supabase is unavailable and in-memory repository fallback is disabled")
+
+    def _ensure_team_owned(self, team_id: str, user_id: str) -> None:
+        if self._client:
+            result = self._client.table("teams").select("id").eq("id", team_id).eq("user_id", user_id).limit(1).execute()
+            if not result.data:
+                raise PermissionError("Team is not accessible for this user")
+            return
+
+        # Fallback mode cannot verify ownership against auth.users table. Require explicit UUID-like ids and allow tests.
+        _ = (team_id, user_id)
+
+    def _ensure_session_owned(self, session_id: str, user_id: str) -> None:
+        if self._client:
+            result = self._client.table("sessions").select("id").eq("id", session_id).eq("user_id", user_id).limit(1).execute()
+            if not result.data:
+                raise PermissionError("Session is not accessible for this user")
+            return
+
+        _ = (session_id, user_id)
+
+    def insert_document(self, user_id: str, team_id: str, filename: str, file_type: str, chunk_count: int) -> dict[str, Any]:
+        self._ensure_team_owned(team_id=team_id, user_id=user_id)
+
         payload = {
             "id": str(uuid4()),
             "team_id": team_id,
@@ -45,21 +75,11 @@ class SupabaseRepository:
         }
 
         if self._client:
-            try:
-                result = self._client.table("documents").insert(
-                    {
-                        "team_id": team_id,
-                        "filename": filename,
-                        "file_type": file_type,
-                        "chunk_count": chunk_count,
-                    }
-                ).execute()
-                if result.data:
-                    return result.data[0]
-            except Exception as exc:
-                logger.exception("Failed to insert document in Supabase, falling back to in-memory", extra={"error": str(exc)})
+            result = self._client.table("documents").insert(payload).execute()
+            if result.data:
+                return result.data[0]
 
-        self._memory_documents.append(payload)
+        _FALLBACK.documents.append(payload)
         return payload
 
     def insert_chunks(self, document_id: str, chunks: list[dict[str, Any]]) -> None:
@@ -75,45 +95,37 @@ class SupabaseRepository:
         ]
 
         if self._client:
-            try:
-                self._client.table("chunks").insert(rows).execute()
-                return
-            except Exception as exc:
-                logger.exception("Failed to insert chunks in Supabase, falling back to in-memory", extra={"error": str(exc)})
+            self._client.table("chunks").insert(rows).execute()
+            return
 
         for row in rows:
-            memory_row = {"id": str(uuid4()), **row, "created_at": datetime.now(timezone.utc).isoformat()}
-            self._memory_chunks.append(memory_row)
+            _FALLBACK.chunks.append({"id": str(uuid4()), **row, "created_at": datetime.now(timezone.utc).isoformat()})
 
-    def list_documents(self, team_id: str) -> list[dict[str, Any]]:
+    def list_documents(self, user_id: str, team_id: str) -> list[dict[str, Any]]:
+        self._ensure_team_owned(team_id=team_id, user_id=user_id)
         if self._client:
-            try:
-                result = self._client.table("documents").select("*").eq("team_id", team_id).order("uploaded_at", desc=True).execute()
-                return result.data or []
-            except Exception as exc:
-                logger.exception("Failed to list documents from Supabase, falling back to in-memory", extra={"error": str(exc)})
+            result = self._client.table("documents").select("*").eq("team_id", team_id).order("uploaded_at", desc=True).execute()
+            return result.data or []
 
-        docs = [doc for doc in self._memory_documents if doc["team_id"] == team_id]
+        docs = [doc for doc in _FALLBACK.documents if doc["team_id"] == team_id]
         return sorted(docs, key=lambda item: item["uploaded_at"], reverse=True)
 
-    def search_chunks(self, team_id: str, query_embedding: list[float], top_k: int = 5) -> list[dict[str, Any]]:
+    def search_chunks(self, user_id: str, team_id: str, query_embedding: list[float], top_k: int = 5) -> list[dict[str, Any]]:
+        self._ensure_team_owned(team_id=team_id, user_id=user_id)
         if self._client:
-            try:
-                result = self._client.rpc(
-                    "match_chunks",
-                    {
-                        "query_embedding": query_embedding,
-                        "filter_team_id": team_id,
-                        "match_count": top_k,
-                    },
-                ).execute()
-                return result.data or []
-            except Exception as exc:
-                logger.exception("Failed to search chunks in Supabase, falling back to in-memory", extra={"error": str(exc)})
+            result = self._client.rpc(
+                "match_chunks",
+                {
+                    "query_embedding": query_embedding,
+                    "filter_team_id": team_id,
+                    "match_count": top_k,
+                },
+            ).execute()
+            return result.data or []
 
-        document_map = {document["id"]: document for document in self._memory_documents if document["team_id"] == team_id}
+        document_map = {document["id"]: document for document in _FALLBACK.documents if document["team_id"] == team_id}
         scored_rows: list[dict[str, Any]] = []
-        for chunk in self._memory_chunks:
+        for chunk in _FALLBACK.chunks:
             document = document_map.get(chunk["document_id"])
             if not document:
                 continue
@@ -135,12 +147,15 @@ class SupabaseRepository:
 
     def save_query(
         self,
+        user_id: str,
         session_id: str,
         query_text: str,
         final_answer: str,
         scorecard: dict[str, Any],
         response_time_ms: int,
     ) -> dict[str, Any]:
+        self._ensure_session_owned(session_id=session_id, user_id=user_id)
+
         payload = {
             "id": str(uuid4()),
             "session_id": session_id,
@@ -154,24 +169,11 @@ class SupabaseRepository:
         }
 
         if self._client:
-            try:
-                result = self._client.table("queries").insert(
-                    {
-                        "session_id": session_id,
-                        "query_text": query_text,
-                        "final_answer": final_answer,
-                        "overall_score": scorecard.get("overall"),
-                        "citation_accuracy": scorecard.get("citation_accuracy"),
-                        "insight_depth": scorecard.get("insight_depth"),
-                        "response_time_ms": response_time_ms,
-                    }
-                ).execute()
-                if result.data:
-                    return result.data[0]
-            except Exception as exc:
-                logger.exception("Failed to save query in Supabase, falling back to in-memory", extra={"error": str(exc)})
+            result = self._client.table("queries").insert(payload).execute()
+            if result.data:
+                return result.data[0]
 
-        self._memory_queries.append(payload)
+        _FALLBACK.queries.append(payload)
         return payload
 
     def save_agent_traces(self, query_id: str, traces: list[dict[str, Any]]) -> None:
@@ -189,15 +191,11 @@ class SupabaseRepository:
         ]
 
         if self._client:
-            try:
-                self._client.table("agent_traces").insert(rows).execute()
-                return
-            except Exception as exc:
-                logger.exception("Failed to save agent traces in Supabase, falling back to in-memory", extra={"error": str(exc)})
+            self._client.table("agent_traces").insert(rows).execute()
+            return
 
         for row in rows:
-            memory_row = {"id": str(uuid4()), **row, "created_at": datetime.now(timezone.utc).isoformat()}
-            self._memory_agent_traces.append(memory_row)
+            _FALLBACK.agent_traces.append({"id": str(uuid4()), **row, "created_at": datetime.now(timezone.utc).isoformat()})
 
     def save_session_log(
         self,
@@ -218,45 +216,32 @@ class SupabaseRepository:
         }
 
         if self._client:
-            try:
-                result = self._client.table("session_logs").insert(
-                    {
-                        "session_id": session_id,
-                        "team_id": team_id,
-                        "event_type": event_type,
-                        "request_id": request_id,
-                        "payload": payload or {},
-                    }
-                ).execute()
-                if result.data:
-                    return result.data[0]
-            except Exception as exc:
-                logger.exception("Failed to save session log in Supabase, falling back to in-memory", extra={"error": str(exc)})
+            result = self._client.table("session_logs").insert(row).execute()
+            if result.data:
+                return result.data[0]
 
-        self._memory_session_logs.append(row)
+        _FALLBACK.session_logs.append(row)
         return row
 
-    def list_queries(self, session_id: str, limit: int = 50) -> list[dict[str, Any]]:
+    def list_queries(self, user_id: str, session_id: str, limit: int = 50) -> list[dict[str, Any]]:
+        self._ensure_session_owned(session_id=session_id, user_id=user_id)
         if self._client:
-            try:
-                result = (
-                    self._client.table("queries")
-                    .select("*")
-                    .eq("session_id", session_id)
-                    .order("created_at", desc=True)
-                    .limit(limit)
-                    .execute()
-                )
-                return result.data or []
-            except Exception as exc:
-                logger.exception("Failed to list queries from Supabase, falling back to in-memory", extra={"error": str(exc)})
+            result = (
+                self._client.table("queries")
+                .select("*")
+                .eq("session_id", session_id)
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return result.data or []
 
-        rows = [row for row in self._memory_queries if row.get("session_id") == session_id]
+        rows = [row for row in _FALLBACK.queries if row.get("session_id") == session_id]
         rows.sort(key=lambda item: item.get("created_at", ""), reverse=True)
         return rows[:limit]
 
-    def list_dashboard_metrics(self, session_id: str, days: int = 7) -> dict[str, Any]:
-        rows = self.list_queries(session_id=session_id, limit=500)
+    def list_dashboard_metrics(self, user_id: str, session_id: str, days: int = 7) -> dict[str, Any]:
+        rows = self.list_queries(user_id=user_id, session_id=session_id, limit=500)
         total_queries = len(rows)
         avg_response_ms = int(sum(int(row.get("response_time_ms", 0)) for row in rows) / total_queries) if total_queries else 0
         avg_overall_score = (

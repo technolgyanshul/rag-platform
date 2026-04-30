@@ -53,8 +53,10 @@ class GroqClient:
                     )
                     break
 
-        last_prompt = messages[-1]["content"] if messages else ""
-        return f"Fallback {model} response: {str(last_prompt)[:300]}"
+        return (
+            "Model provider is temporarily unavailable. "
+            "Please retry your query in a few moments."
+        )
 
     def _chat_with_timeout(self, messages: list[dict], model: str) -> str:
         with ThreadPoolExecutor(max_workers=1) as pool:

@@ -9,8 +9,9 @@ client = TestClient(app)
 
 def test_query_returns_top_k_sources() -> None:
     repository = SupabaseRepository()
-    team_id = "phase4-team"
-    document = repository.insert_document(team_id=team_id, filename="report.txt", file_type="txt", chunk_count=2)
+    team_id = "55555555-5555-5555-5555-555555555555"
+    user_id = "00000000-0000-0000-0000-000000000001"
+    document = repository.insert_document(user_id=user_id, team_id=team_id, filename="report.txt", file_type="txt", chunk_count=2)
     repository.insert_chunks(
         document_id=document["id"],
         chunks=[
@@ -21,7 +22,7 @@ def test_query_returns_top_k_sources() -> None:
 
     response = client.post(
         "/query",
-        json={"query": "alpha", "team_id": team_id, "session_id": "session-a", "top_k": 1},
+        json={"query": "alpha", "team_id": team_id, "session_id": "66666666-6666-6666-6666-666666666666", "top_k": 1},
     )
 
     assert response.status_code == 200
@@ -42,7 +43,12 @@ def test_query_returns_top_k_sources() -> None:
 def test_query_returns_insufficient_context_when_no_hits() -> None:
     response = client.post(
         "/query",
-        json={"query": "unknown", "team_id": "empty-team", "session_id": "session-b", "top_k": 3},
+        json={
+            "query": "unknown",
+            "team_id": "77777777-7777-7777-7777-777777777777",
+            "session_id": "88888888-8888-8888-8888-888888888888",
+            "top_k": 3,
+        },
     )
 
     assert response.status_code == 200

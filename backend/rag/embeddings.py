@@ -18,6 +18,10 @@ def _get_embedding_model():
     if _embedding_model is not None:
         return _embedding_model
 
+    if os.getenv("EMBEDDING_DISABLE_MODEL", "false").lower() == "true":
+        _embedding_model = False
+        return _embedding_model
+
     try:
         from sentence_transformers import SentenceTransformer
 
