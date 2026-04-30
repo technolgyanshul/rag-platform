@@ -23,28 +23,37 @@ export function QueryInput({ onSubmit, disabled = false }: QueryInputProps) {
 
   return (
     <form className="auth-form" onSubmit={handleSubmit}>
-      <label htmlFor="chat-team-id">Team ID</label>
-      <input id="chat-team-id" value={teamId} onChange={(event) => setTeamId(event.target.value)} placeholder="Team UUID" />
+      <div className="split-3">
+        <label htmlFor="chat-team-id">
+          Team ID
+          <input id="chat-team-id" value={teamId} onChange={(event) => setTeamId(event.target.value)} placeholder="Team UUID" />
+        </label>
 
-      <label htmlFor="chat-session-id">Session ID</label>
-      <input
-        id="chat-session-id"
-        value={sessionId}
-        onChange={(event) => setSessionId(event.target.value)}
-        placeholder="Session UUID"
-      />
+        <label htmlFor="chat-session-id">
+          Session ID
+          <input
+            id="chat-session-id"
+            value={sessionId}
+            onChange={(event) => setSessionId(event.target.value)}
+            placeholder="Session UUID"
+          />
+        </label>
 
-      <label htmlFor="chat-top-k">Top K</label>
-      <input
-        id="chat-top-k"
-        type="number"
-        min={1}
-        max={20}
-        value={topK}
-        onChange={(event) => setTopK(Number(event.target.value) || 5)}
-      />
+        <label htmlFor="chat-top-k">
+          Top K
+          <input
+            id="chat-top-k"
+            type="number"
+            min={1}
+            max={20}
+            value={topK}
+            onChange={(event) => setTopK(Number(event.target.value) || 5)}
+          />
+        </label>
+      </div>
 
-      <label htmlFor="chat-query">Question</label>
+      <label htmlFor="chat-query">
+        Question
       <textarea
         id="chat-query"
         value={query}
@@ -52,6 +61,7 @@ export function QueryInput({ onSubmit, disabled = false }: QueryInputProps) {
         rows={4}
         placeholder="Ask a question grounded in your uploaded files..."
       />
+      </label>
 
       <button type="submit" disabled={disabled}>
         {disabled ? "Running..." : "Run Query"}

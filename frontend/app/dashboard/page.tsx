@@ -5,6 +5,7 @@ import { FormEvent, useState } from "react";
 import { ProtectedPage } from "../../components/auth/ProtectedPage";
 import { MetricsCards } from "../../components/dashboard/MetricsCards";
 import { QueriesChart } from "../../components/dashboard/QueriesChart";
+import { AppShell } from "../../components/layout/AppShell";
 import { getDashboardMetrics } from "../../lib/api";
 import { DashboardMetrics } from "../../lib/types";
 
@@ -32,39 +33,54 @@ export default function DashboardPage() {
 
   return (
     <ProtectedPage>
-      <main className="container page-stack">
-        <h1>Dashboard</h1>
-        <div className="card auth-card">
-          <form className="auth-form" onSubmit={handleLoad}>
-            <label htmlFor="dashboard-session-id">Session ID</label>
-            <input
-              id="dashboard-session-id"
-              value={sessionId}
-              onChange={(event) => setSessionId(event.target.value)}
-              placeholder="Session UUID"
-            />
-            <label htmlFor="dashboard-days">Days</label>
-            <input
-              id="dashboard-days"
-              type="number"
-              min={1}
-              max={30}
-              value={days}
-              onChange={(event) => setDays(Number(event.target.value) || 7)}
-            />
-            <button type="submit">Load Metrics</button>
-          </form>
-          {message && <p className="status-message">{message}</p>}
-        </div>
+      <AppShell
+        title="Platform Telemetry"
+        subtitle="Track query volume, generation quality, and retrieval latency"
+        actions={
+          <button type="button" onClick={() => setMetrics(null)} disabled={!metrics}>
+            Clear View
+          </button>
+        }
+      >
         <div className="card">
-          <h2>Summary</h2>
+          <form className="split-3" onSubmit={handleLoad}>
+            <label>
+              Session ID
+              <input
+                id="dashboard-session-id"
+                value={sessionId}
+                onChange={(event) => setSessionId(event.target.value)}
+                placeholder="Session UUID"
+              />
+            </label>
+            <label>
+              Time Window (days)
+              <input
+                id="dashboard-days"
+                type="number"
+                min={1}
+                max={30}
+                value={days}
+                onChange={(event) => setDays(Number(event.target.value) || 7)}
+              />
+            </label>
+            <div style={{ display: "grid", alignItems: "end" }}>
+              <button type="submit">Load Metrics</button>
+            </div>
+          </form>
+          {message ? <p className="status-message" style={{ marginTop: 12 }}>{message}</p> : null}
+        </div>
+
+        <div className="card">
+          <h3 style={{ marginBottom: 12 }}>Scorecards</h3>
           <MetricsCards metrics={metrics} />
         </div>
+
         <div className="card">
-          <h2>Queries Over Time</h2>
+          <h3 style={{ marginBottom: 12 }}>Queries Over Time</h3>
           <QueriesChart metrics={metrics} />
         </div>
-      </main>
+      </AppShell>
     </ProtectedPage>
   );
 }

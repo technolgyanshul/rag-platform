@@ -35,9 +35,12 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="container">
+    <main className="auth-page">
       <div className="card auth-card">
-        <h1>Login</h1>
+        <div className="auth-brand">
+          <h1>Operator Login</h1>
+          <p>Access RAG mission control</p>
+        </div>
         <form className="auth-form" onSubmit={handleLogin}>
           <label htmlFor="email">Email</label>
           <input

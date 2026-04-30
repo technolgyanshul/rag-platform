@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { ProtectedPage } from "../../components/auth/ProtectedPage";
+import { AppShell } from "../../components/layout/AppShell";
 import { supabase } from "../../lib/supabase";
 
 export default function ProfilePage() {
@@ -39,16 +40,41 @@ export default function ProfilePage() {
 
   return (
     <ProtectedPage>
-      <main className="container">
-        <div className="card auth-card">
-          <h1>Profile</h1>
-          {loading ? <p>Loading profile...</p> : <p>Email: {email || "Unavailable"}</p>}
-          {message && <p className="status-message">{message}</p>}
+      <AppShell
+        title="User Profile"
+        subtitle="Manage identity metadata and active account access"
+        actions={
           <button type="button" onClick={handleLogout}>
             Log out
           </button>
+        }
+      >
+        <div className="split-2">
+          <div className="card">
+            <h3 style={{ marginBottom: 8 }}>Operator Identity</h3>
+            {loading ? <p className="status-message">Loading profile...</p> : <p>Email: {email || "Unavailable"}</p>}
+            <p className="status-message" style={{ marginTop: 10 }}>
+              Role: Senior Operator
+            </p>
+            <p className="status-message">Environment: Light Theme Console</p>
+          </div>
+
+          <div className="card">
+            <h3 style={{ marginBottom: 8 }}>Security Protocol</h3>
+            <ul className="history-list">
+              <li className="history-item">
+                <strong>Two-Factor Authentication</strong>
+                <p className="status-message">Recommended for admin-level accounts.</p>
+              </li>
+              <li className="history-item">
+                <strong>API Tokens</strong>
+                <p className="status-message">Rotate service tokens every 30 days.</p>
+              </li>
+            </ul>
+          </div>
         </div>
-      </main>
+        {message ? <p className="status-message">{message}</p> : null}
+      </AppShell>
     </ProtectedPage>
   );
 }

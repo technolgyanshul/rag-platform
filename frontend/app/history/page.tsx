@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 
 import { ProtectedPage } from "../../components/auth/ProtectedPage";
+import { AppShell } from "../../components/layout/AppShell";
 import { listQueryHistory } from "../../lib/api";
 import { QueryHistoryItem } from "../../lib/types";
 
@@ -29,41 +30,56 @@ export default function HistoryPage() {
 
   return (
     <ProtectedPage>
-      <main className="container page-stack">
-        <h1>Query History</h1>
-        <div className="card auth-card">
-          <form className="auth-form" onSubmit={handleLoad}>
-            <label htmlFor="history-session-id">Session ID</label>
-            <input
-              id="history-session-id"
-              value={sessionId}
-              onChange={(event) => setSessionId(event.target.value)}
-              placeholder="Session UUID"
-            />
-            <button type="submit">Load History</button>
+      <AppShell title="Query Logs" subtitle="Audit previous prompts, answers, scores, and latency">
+        <div className="card">
+          <form className="split-2" onSubmit={handleLoad}>
+            <label htmlFor="history-session-id">
+              Session ID
+              <input
+                id="history-session-id"
+                value={sessionId}
+                onChange={(event) => setSessionId(event.target.value)}
+                placeholder="Session UUID"
+              />
+            </label>
+            <div style={{ display: "grid", alignItems: "end" }}>
+              <button type="submit">Load History</button>
+            </div>
           </form>
         </div>
+
         <div className="card">
-          <h2>Past Queries</h2>
+          <h3 style={{ marginBottom: 12 }}>Past Queries</h3>
           {!rows.length ? (
             <p className="status-message">{message}</p>
           ) : (
-            <ul className="history-list">
-              {rows.map((row) => (
-                <li key={row.id} className="history-item">
-                  <p>
-                    <strong>{row.query_text}</strong>
-                  </p>
-                  <p>{row.final_answer}</p>
-                  <p className="status-message">
-                    Score: {row.overall_score ?? "N/A"} | Response: {row.response_time_ms ?? "N/A"} ms | {row.created_at}
-                  </p>
-                </li>
-              ))}
-            </ul>
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Query</th>
+                    <th>Answer Preview</th>
+                    <th>Score</th>
+                    <th>Latency</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row: QueryHistoryItem) => (
+                    <tr key={row.id}>
+                      <td>{row.query_text}</td>
+                      <td>{row.final_answer.slice(0, 140)}...</td>
+                      <td>{row.overall_score ?? "N/A"}</td>
+                      <td>{row.response_time_ms ? `${row.response_time_ms} ms` : "N/A"}</td>
+                      <td>{new Date(row.created_at).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
-      </main>
+      </AppShell>
     </ProtectedPage>
   );
 }

@@ -41,13 +41,16 @@ export function UploadPanel({ teamId, onUploaded }: UploadPanelProps) {
 
   return (
     <div className="card">
-      <h2>Upload Knowledge</h2>
+      <h3 style={{ marginBottom: 12 }}>Upload Document</h3>
       <form className="auth-form" onSubmit={handleSubmit}>
-        <input
-          type="file"
-          accept=".pdf,.png,.jpg,.jpeg,.txt"
-          onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-        />
+        <label>
+          File
+          <input
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg,.txt"
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+          />
+        </label>
         <button type="submit" disabled={loading}>
           {loading ? "Uploading..." : "Upload"}
         </button>

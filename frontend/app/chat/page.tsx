@@ -8,6 +8,7 @@ import { ChatWindow } from "../../components/chat/ChatWindow";
 import { QueryInput } from "../../components/chat/QueryInput";
 import { ScoreCard } from "../../components/chat/ScoreCard";
 import { SourceList } from "../../components/chat/SourceList";
+import { AppShell } from "../../components/layout/AppShell";
 import { runQuery } from "../../lib/api";
 import { QueryResponse, QueryUiState } from "../../lib/types";
 
@@ -36,29 +37,38 @@ export default function ChatPage() {
 
   return (
     <ProtectedPage>
-      <main className="container page-stack">
-        <h1>Research Chat</h1>
-        <div className="card">
-          <h2>Run Query</h2>
-          <QueryInput onSubmit={handleSubmit} disabled={queryState.status === "loading"} />
+      <AppShell
+        title="Chat Workspace"
+        subtitle="Run multi-agent retrieval flows and inspect the execution details"
+      >
+        <div className="chat-layout">
+          <div className="stack">
+            <div className="card">
+              <h3 style={{ marginBottom: 12 }}>Run Query</h3>
+              <QueryInput onSubmit={handleSubmit} disabled={queryState.status === "loading"} />
+            </div>
+            <div className="card">
+              <h3 style={{ marginBottom: 12 }}>Answer</h3>
+              <ChatWindow queryState={queryState} />
+            </div>
+          </div>
+
+          <div className="stack">
+            <div className="card">
+              <h3 style={{ marginBottom: 12 }}>Sources</h3>
+              <SourceList sources={response?.sources ?? []} />
+            </div>
+            <div className="card">
+              <h3 style={{ marginBottom: 12 }}>Agent Trace</h3>
+              <AgentTrace traces={response?.agent_trace ?? []} />
+            </div>
+            <div className="card">
+              <h3 style={{ marginBottom: 12 }}>Scorecard</h3>
+              <ScoreCard scorecard={response?.scorecard ?? null} />
+            </div>
+          </div>
         </div>
-        <div className="card">
-          <h2>Answer</h2>
-          <ChatWindow queryState={queryState} />
-        </div>
-        <div className="card">
-          <h2>Sources</h2>
-          <SourceList sources={response?.sources ?? []} />
-        </div>
-        <div className="card">
-          <h2>Agent Trace</h2>
-          <AgentTrace traces={response?.agent_trace ?? []} />
-        </div>
-        <div className="card">
-          <h2>Scorecard</h2>
-          <ScoreCard scorecard={response?.scorecard ?? null} />
-        </div>
-      </main>
+      </AppShell>
     </ProtectedPage>
   );
 }

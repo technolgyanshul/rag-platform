@@ -36,9 +36,12 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="container">
+    <main className="auth-page">
       <div className="card auth-card">
-        <h1>Register</h1>
+        <div className="auth-brand">
+          <h1>Create Operator Account</h1>
+          <p>Provision access to the RAG control plane</p>
+        </div>
         <form className="auth-form" onSubmit={handleRegister}>
           <label htmlFor="email">Email</label>
           <input

@@ -17,7 +17,7 @@ export function ChatWindow({ queryState }: ChatWindowProps) {
   const response = queryState.data;
 
   return (
-    <div>
+    <div className="stack">
       <p>
         <strong>Query:</strong> {response.query}
       </p>
@@ -28,7 +28,8 @@ export function ChatWindow({ queryState }: ChatWindowProps) {
         Retrieval count: {response.retrieval_count} | Insufficient context: {response.insufficient_context ? "yes" : "no"}
       </p>
       <p className="status-message">
-        Model version: {response.model_version} | Embeddings: {response.retrieval_metadata.embedding_model_version} | Index: {response.retrieval_metadata.index_version}
+        Model version: {response.model_version} | Embeddings: {response.retrieval_metadata.embedding_model_version} | Index:{" "}
+        {response.retrieval_metadata.index_version}
       </p>
     </div>
   );
