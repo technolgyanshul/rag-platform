@@ -29,7 +29,19 @@ export type QueryResponse = {
   agent_trace: AgentTraceRow[];
   retrieval_count: number;
   insufficient_context: boolean;
+  model_version: string;
+  retrieval_metadata: {
+    embedding_model_version: string;
+    index_version: string;
+    top_k: number;
+  };
 };
+
+export type QueryUiState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "success"; data: QueryResponse }
+  | { status: "error"; message: string };
 
 export type QueryHistoryItem = {
   id: string;

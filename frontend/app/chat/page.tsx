@@ -9,16 +9,13 @@ import { QueryInput } from "../../components/chat/QueryInput";
 import { ScoreCard } from "../../components/chat/ScoreCard";
 import { SourceList } from "../../components/chat/SourceList";
 import { runQuery } from "../../lib/api";
-import { QueryResponse } from "../../lib/types";
+import { QueryResponse, QueryUiState } from "../../lib/types";
 
 export default function ChatPage() {
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [response, setResponse] = useState<QueryResponse | null>(null);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [queryState, setQueryState] = useState<QueryUiState>({ status: "idle" });
 
   const handleSubmit = async (payload: { teamId: string; sessionId: string; query: string; topK: number }) => {
-    setStatus("loading");
-    setErrorMessage("");
+    setQueryState({ status: "loading" });
     try {
       const result = await runQuery({
         query: payload.query,
@@ -26,14 +23,16 @@ export default function ChatPage() {
         session_id: payload.sessionId,
         top_k: payload.topK,
       });
-      setResponse(result);
-      setStatus("success");
+      setQueryState({ status: "success", data: result });
     } catch (error) {
-      setResponse(null);
-      setStatus("error");
-      setErrorMessage(error instanceof Error ? error.message : "Query failed unexpectedly");
+      setQueryState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Query failed unexpectedly",
+      });
     }
   };
+
+  const response: QueryResponse | null = queryState.status === "success" ? queryState.data : null;
 
   return (
     <ProtectedPage>
@@ -41,11 +40,11 @@ export default function ChatPage() {
         <h1>Research Chat</h1>
         <div className="card">
           <h2>Run Query</h2>
-          <QueryInput onSubmit={handleSubmit} disabled={status === "loading"} />
+          <QueryInput onSubmit={handleSubmit} disabled={queryState.status === "loading"} />
         </div>
         <div className="card">
           <h2>Answer</h2>
-          <ChatWindow status={status} response={response} errorMessage={errorMessage} />
+          <ChatWindow queryState={queryState} />
         </div>
         <div className="card">
           <h2>Sources</h2>

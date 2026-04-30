@@ -1,24 +1,20 @@
-import { QueryResponse } from "../../lib/types";
+import { QueryUiState } from "../../lib/types";
 
 type ChatWindowProps = {
-  status: "idle" | "loading" | "success" | "error";
-  response: QueryResponse | null;
-  errorMessage: string;
+  queryState: QueryUiState;
 };
 
-export function ChatWindow({ status, response, errorMessage }: ChatWindowProps) {
-  if (status === "idle") {
+export function ChatWindow({ queryState }: ChatWindowProps) {
+  if (queryState.status === "idle") {
     return <p className="status-message">Run a query to view the answer, trace, and scorecard.</p>;
   }
-  if (status === "loading") {
+  if (queryState.status === "loading") {
     return <p className="status-message">Running retrieval and multi-agent pipeline...</p>;
   }
-  if (status === "error") {
-    return <p className="status-message">{errorMessage}</p>;
+  if (queryState.status === "error") {
+    return <p className="status-message">{queryState.message}</p>;
   }
-  if (!response) {
-    return <p className="status-message">No response returned.</p>;
-  }
+  const response = queryState.data;
 
   return (
     <div>
@@ -30,6 +26,9 @@ export function ChatWindow({ status, response, errorMessage }: ChatWindowProps) 
       </p>
       <p className="status-message">
         Retrieval count: {response.retrieval_count} | Insufficient context: {response.insufficient_context ? "yes" : "no"}
+      </p>
+      <p className="status-message">
+        Model version: {response.model_version} | Embeddings: {response.retrieval_metadata.embedding_model_version} | Index: {response.retrieval_metadata.index_version}
       </p>
     </div>
   );
