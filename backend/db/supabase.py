@@ -16,6 +16,7 @@ class SupabaseRepository:
     _memory_chunks: list[dict[str, Any]] = []
     _memory_queries: list[dict[str, Any]] = []
     _memory_agent_traces: list[dict[str, Any]] = []
+    _memory_session_logs: list[dict[str, Any]] = []
 
     def __init__(self) -> None:
         self._client = None
@@ -197,6 +198,43 @@ class SupabaseRepository:
         for row in rows:
             memory_row = {"id": str(uuid4()), **row, "created_at": datetime.now(timezone.utc).isoformat()}
             self._memory_agent_traces.append(memory_row)
+
+    def save_session_log(
+        self,
+        session_id: str,
+        team_id: str,
+        event_type: str,
+        payload: dict[str, Any] | None = None,
+        request_id: str | None = None,
+    ) -> dict[str, Any]:
+        row = {
+            "id": str(uuid4()),
+            "session_id": session_id,
+            "team_id": team_id,
+            "event_type": event_type,
+            "request_id": request_id,
+            "payload": payload or {},
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        if self._client:
+            try:
+                result = self._client.table("session_logs").insert(
+                    {
+                        "session_id": session_id,
+                        "team_id": team_id,
+                        "event_type": event_type,
+                        "request_id": request_id,
+                        "payload": payload or {},
+                    }
+                ).execute()
+                if result.data:
+                    return result.data[0]
+            except Exception as exc:
+                logger.exception("Failed to save session log in Supabase, falling back to in-memory", extra={"error": str(exc)})
+
+        self._memory_session_logs.append(row)
+        return row
 
     def list_queries(self, session_id: str, limit: int = 50) -> list[dict[str, Any]]:
         if self._client:

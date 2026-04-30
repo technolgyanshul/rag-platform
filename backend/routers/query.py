@@ -19,6 +19,30 @@ router = APIRouter(prefix="/query", tags=["query"])
 logger = logging.getLogger(__name__)
 
 
+def _log_session_event(
+    repository: SupabaseRepository,
+    *,
+    session_id: str,
+    team_id: str,
+    request_id: str,
+    event_type: str,
+    payload: dict[str, Any],
+) -> None:
+    try:
+        repository.save_session_log(
+            session_id=session_id,
+            team_id=team_id,
+            event_type=event_type,
+            payload=payload,
+            request_id=request_id,
+        )
+    except Exception:
+        logger.exception(
+            "query_session_event_log_failed",
+            extra={"request_id": request_id, "session_id": session_id, "team_id": team_id, "event_type": event_type},
+        )
+
+
 class QueryRequest(BaseModel):
     query: str = Field(min_length=1, max_length=get_settings().max_query_length)
     team_id: str = Field(min_length=1, max_length=128)
@@ -68,8 +92,17 @@ class QueryHistoryItem(BaseModel):
 @router.post("", response_model=QueryResponse)
 def run_query(payload: QueryRequest, request: Request) -> QueryResponse:
     settings = get_settings()
+    repository = SupabaseRepository()
     request_id = getattr(request.state, "request_id", "unknown")
     query_start = time.perf_counter()
+    _log_session_event(
+        repository,
+        session_id=payload.session_id,
+        team_id=payload.team_id,
+        request_id=request_id,
+        event_type="query_started",
+        payload={"top_k": payload.top_k or settings.top_k, "query": payload.query},
+    )
     logger.info(
         "query_request_started",
         extra={"request_id": request_id, "team_id": payload.team_id, "session_id": payload.session_id, "top_k": payload.top_k},
@@ -86,6 +119,19 @@ def run_query(payload: QueryRequest, request: Request) -> QueryResponse:
         raise HTTPException(status_code=503, detail="Retrieval temporarily unavailable") from error
 
     if not sources:
+        _log_session_event(
+            repository,
+            session_id=payload.session_id,
+            team_id=payload.team_id,
+            request_id=request_id,
+            event_type="query_completed",
+            payload={
+                "query": payload.query,
+                "retrieval_count": 0,
+                "insufficient_context": True,
+                "latency_ms": int((time.perf_counter() - query_start) * 1000),
+            },
+        )
         logger.info(
             "query_request_no_sources",
             extra={
@@ -121,7 +167,6 @@ def run_query(payload: QueryRequest, request: Request) -> QueryResponse:
         logger.exception("query_request_orchestration_failed", extra={"request_id": request_id})
         raise HTTPException(status_code=503, detail="Answer generation temporarily unavailable") from error
 
-    repository = SupabaseRepository()
     total_response_ms = int((time.perf_counter() - query_start) * 1000)
     try:
         query_row = repository.save_query(
@@ -132,7 +177,29 @@ def run_query(payload: QueryRequest, request: Request) -> QueryResponse:
             response_time_ms=total_response_ms,
         )
         repository.save_agent_traces(query_id=query_row["id"], traces=graph_result["agent_trace"])
+        _log_session_event(
+            repository,
+            session_id=payload.session_id,
+            team_id=payload.team_id,
+            request_id=request_id,
+            event_type="query_completed",
+            payload={
+                "query_id": query_row["id"],
+                "query": payload.query,
+                "retrieval_count": len(sources),
+                "insufficient_context": False,
+                "latency_ms": total_response_ms,
+            },
+        )
     except Exception as error:
+        _log_session_event(
+            repository,
+            session_id=payload.session_id,
+            team_id=payload.team_id,
+            request_id=request_id,
+            event_type="query_persistence_failed",
+            payload={"error": str(error), "query": payload.query},
+        )
         logger.exception("query_request_persistence_failed", extra={"request_id": request_id, "session_id": payload.session_id})
         raise HTTPException(status_code=503, detail="Query persistence temporarily unavailable") from error
 

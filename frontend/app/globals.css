@@ -1,5 +1,5 @@
 :root {
-  --bg: #f4f6f8;
+  --bg: #ffffff;
   --surface: #ffffff;
   --text: #102a43;
   --muted: #486581;
@@ -14,7 +14,7 @@
 body {
   margin: 0;
   font-family: "Source Sans 3", "Segoe UI", sans-serif;
-  background: radial-gradient(circle at top right, #e0f2f1, var(--bg));
+  background: var(--bg);
   color: var(--text);
 }
 
