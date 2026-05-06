@@ -11,6 +11,7 @@ def test_query_returns_top_k_sources() -> None:
     repository = SupabaseRepository()
     team_id = "55555555-5555-5555-5555-555555555555"
     user_id = "00000000-0000-0000-0000-000000000001"
+    repository.create_team(user_id=user_id, team_id=team_id, name="Team 555")
     document = repository.insert_document(user_id=user_id, team_id=team_id, filename="report.txt", file_type="txt", chunk_count=2)
     repository.insert_chunks(
         document_id=document["id"],
@@ -41,6 +42,12 @@ def test_query_returns_top_k_sources() -> None:
 
 
 def test_query_returns_insufficient_context_when_no_hits() -> None:
+    repository = SupabaseRepository()
+    repository.create_team(
+        user_id="00000000-0000-0000-0000-000000000001",
+        team_id="77777777-7777-7777-7777-777777777777",
+        name="Team 777",
+    )
     response = client.post(
         "/query",
         json={

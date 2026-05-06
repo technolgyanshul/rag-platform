@@ -76,6 +76,7 @@ python backend/tests/evaluation/run_eval.py
 - `GET /health`
 - `POST /ingest`
 - `GET /ingest/documents`
+- `POST /sessions`
 - `POST /query`
 - `GET /query/history`
 - `GET /dashboard/metrics`

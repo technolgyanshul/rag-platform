@@ -62,6 +62,7 @@ Primary user flow:
 - `GET /health`
 - `POST /ingest`
 - `GET /ingest/documents`
+- `POST /sessions`
 - `POST /query`
 - `GET /query/history`
 - `GET /dashboard/metrics`
@@ -126,7 +127,8 @@ Primary env keys (see `.env.example`):
 - Backend auth/data:
   - `SUPABASE_URL`
   - `SUPABASE_SERVICE_ROLE_KEY`
-  - `NEXT_PUBLIC_SUPABASE_ANON_KEY` (or `SUPABASE_ANON_KEY`)
+  - `SUPABASE_ANON_KEY`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY` (local fallback only)
 - Backend behavior:
   - `TOP_K`, `MAX_QUERY_LENGTH`, `MAX_FILE_SIZE_MB`
   - `QUERY_HISTORY_LIMIT_DEFAULT`, `QUERY_HISTORY_LIMIT_MAX`

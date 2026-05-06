@@ -9,16 +9,20 @@ client = TestClient(app)
 
 def test_query_history_returns_saved_rows() -> None:
     repository = SupabaseRepository()
+    team_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    session_id = "33333333-3333-3333-3333-333333333333"
+    repository.create_team(user_id="00000000-0000-0000-0000-000000000001", team_id=team_id, name="Team History")
+    repository.create_session(user_id="00000000-0000-0000-0000-000000000001", team_id=team_id, session_id=session_id)
     row = repository.save_query(
         user_id="00000000-0000-0000-0000-000000000001",
-        session_id="33333333-3333-3333-3333-333333333333",
+        session_id=session_id,
         query_text="What changed in policy A?",
         final_answer="Policy A changed in section 3.",
         scorecard={"overall": 8.2, "citation_accuracy": 8.8, "insight_depth": 7.9},
         response_time_ms=420,
     )
 
-    response = client.get("/query/history", params={"session_id": "33333333-3333-3333-3333-333333333333", "limit": 10})
+    response = client.get("/query/history", params={"session_id": session_id, "limit": 10})
     assert response.status_code == 200
     payload = response.json()
     assert len(payload) >= 1
@@ -27,9 +31,13 @@ def test_query_history_returns_saved_rows() -> None:
 
 def test_dashboard_metrics_returns_aggregates() -> None:
     repository = SupabaseRepository()
+    team_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    session_id = "44444444-4444-4444-4444-444444444444"
+    repository.create_team(user_id="00000000-0000-0000-0000-000000000001", team_id=team_id, name="Team Metrics")
+    repository.create_session(user_id="00000000-0000-0000-0000-000000000001", team_id=team_id, session_id=session_id)
     repository.save_query(
         user_id="00000000-0000-0000-0000-000000000001",
-        session_id="44444444-4444-4444-4444-444444444444",
+        session_id=session_id,
         query_text="Q1",
         final_answer="A1",
         scorecard={"overall": 7.0, "citation_accuracy": 7.0, "insight_depth": 7.0},
@@ -37,14 +45,14 @@ def test_dashboard_metrics_returns_aggregates() -> None:
     )
     repository.save_query(
         user_id="00000000-0000-0000-0000-000000000001",
-        session_id="44444444-4444-4444-4444-444444444444",
+        session_id=session_id,
         query_text="Q2",
         final_answer="A2",
         scorecard={"overall": 9.0, "citation_accuracy": 9.0, "insight_depth": 9.0},
         response_time_ms=500,
     )
 
-    response = client.get("/dashboard/metrics", params={"session_id": "44444444-4444-4444-4444-444444444444", "days": 7})
+    response = client.get("/dashboard/metrics", params={"session_id": session_id, "days": 7})
     assert response.status_code == 200
     payload = response.json()
     assert payload["total_queries"] >= 2

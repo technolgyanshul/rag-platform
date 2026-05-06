@@ -6,6 +6,7 @@ def test_search_chunks_returns_ranked_rows() -> None:
     repository = SupabaseRepository()
     team_id = "11111111-1111-1111-1111-111111111111"
     user_id = "00000000-0000-0000-0000-000000000001"
+    repository.create_team(user_id=user_id, team_id=team_id, name="Team Search")
     document = repository.insert_document(user_id=user_id, team_id=team_id, filename="notes.txt", file_type="txt", chunk_count=2)
     repository.insert_chunks(
         document_id=document["id"],
@@ -36,6 +37,7 @@ def test_retrieve_chunks_returns_rows() -> None:
     repository = SupabaseRepository()
     team_id = "22222222-2222-2222-2222-222222222222"
     user_id = "00000000-0000-0000-0000-000000000001"
+    repository.create_team(user_id=user_id, team_id=team_id, name="Team Retrieve")
     document = repository.insert_document(user_id=user_id, team_id=team_id, filename="doc.txt", file_type="txt", chunk_count=1)
     repository.insert_chunks(
         document_id=document["id"],

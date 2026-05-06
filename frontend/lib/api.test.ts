@@ -2,8 +2,22 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { listKnowledgeDocuments, uploadKnowledgeFile } from "./api";
 
+vi.mock("./supabase", () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: {
+          session: {
+            access_token: "test-token",
+          },
+        },
+      }),
+    },
+  },
+}));
+
 afterEach(() => {
-  vi.restoreAllMocks();
+  vi.clearAllMocks();
 });
 
 describe("uploadKnowledgeFile", () => {
