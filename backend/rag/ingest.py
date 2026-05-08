@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from rag.chunking import chunk_text
-from rag.embeddings import embed_chunks
+from rag.embeddings import embed_chunks, embed_chunks_bge
 from rag.image_text import extract_image_text
 
 
@@ -23,14 +23,16 @@ def ingest_document(file_path: str, file_type: str, chunk_size: int = 1000, chun
     extracted_text = parse_document(file_path=file_path, file_type=file_type)
     chunks = chunk_text(extracted_text, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     embeddings = embed_chunks(chunks)
+    embeddings_bge = embed_chunks_bge(chunks)
     chunk_payload = [
         {
             "chunk_index": index,
             "content": chunk,
             "embedding": embedding,
+            "embedding_bge": embedding_bge,
             "metadata": {"source_type": file_type.lower()},
         }
-        for index, (chunk, embedding) in enumerate(zip(chunks, embeddings))
+        for index, (chunk, embedding, embedding_bge) in enumerate(zip(chunks, embeddings, embeddings_bge))
     ]
     return {"extracted_text": extracted_text, "chunks": chunk_payload}
 

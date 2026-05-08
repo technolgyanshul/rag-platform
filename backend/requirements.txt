@@ -6,3 +6,5 @@ supabase==2.18.1
 pytest==8.3.5
 sentence-transformers==5.1.1
 requests==2.32.3
+pytesseract==0.3.13
+Pillow==11.2.1

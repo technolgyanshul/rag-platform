@@ -126,7 +126,7 @@ def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser = Dep
         )
 
     try:
-        graph_result = run_graph(query=payload.query, sources=sources)
+        graph_result = run_graph(query=payload.query, sources=sources, team_id=auth_user.user_id)
     except Exception as error:
         logger.exception("query_request_orchestration_failed", extra={"request_id": request_id})
         raise HTTPException(status_code=503, detail="Answer generation temporarily unavailable") from error

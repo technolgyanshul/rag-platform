@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { listKnowledgeDocuments, uploadKnowledgeFile } from "./api";
 
-vi.mock("./supabase", () => ({
-  supabase: {
+vi.mock("@/utils/supabase/client", () => ({
+  createClient: vi.fn(() => ({
     auth: {
       getSession: vi.fn().mockResolvedValue({
         data: {
@@ -13,7 +13,7 @@ vi.mock("./supabase", () => ({
         },
       }),
     },
-  },
+  })),
 }));
 
 afterEach(() => {
@@ -37,7 +37,7 @@ describe("uploadKnowledgeFile", () => {
       }),
     );
 
-    const result = await uploadKnowledgeFile("team-1", new File(["hello"], "sample.txt"));
+    const result = await uploadKnowledgeFile(new File(["hello"], "sample.txt"));
     expect(result).toEqual(mockResponse);
   });
 
@@ -50,7 +50,7 @@ describe("uploadKnowledgeFile", () => {
       }),
     );
 
-    await expect(uploadKnowledgeFile("team-1", new File(["hello"], "sample.txt"))).rejects.toThrow("Upload blocked");
+    await expect(uploadKnowledgeFile(new File(["hello"], "sample.txt"))).rejects.toThrow("Upload blocked");
   });
 });
 
@@ -63,6 +63,6 @@ describe("listKnowledgeDocuments", () => {
       }),
     );
 
-    await expect(listKnowledgeDocuments("team-1")).rejects.toThrow("Could not load documents");
+    await expect(listKnowledgeDocuments()).rejects.toThrow("Could not load documents");
   });
 });

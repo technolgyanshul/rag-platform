@@ -153,16 +153,18 @@ class SupabaseRepository:
         return payload
 
     def insert_chunks(self, document_id: str, chunks: list[dict[str, Any]]) -> None:
-        rows = [
-            {
+        rows = []
+        for chunk in chunks:
+            row: dict[str, Any] = {
                 "document_id": document_id,
                 "chunk_index": chunk["chunk_index"],
                 "content": chunk["content"],
                 "embedding": chunk["embedding"],
                 "metadata": chunk.get("metadata", {}),
             }
-            for chunk in chunks
-        ]
+            if "embedding_bge" in chunk:
+                row["embedding_bge"] = chunk["embedding_bge"]
+            rows.append(row)
 
         if self._client:
             self._client.table("chunks").insert(rows).execute()
@@ -214,6 +216,43 @@ class SupabaseRepository:
 
         scored_rows.sort(key=lambda row: row["similarity"], reverse=True)
         return scored_rows[:top_k]
+
+    def hybrid_search_chunks(
+        self,
+        user_id: str,
+        query_embedding: list[float],
+        query_embedding_bge: list[float],
+        query_text: str,
+        top_k: int = 5,
+    ) -> list[dict[str, Any]]:
+        workspace_id = self._ensure_workspace(user_id)
+        if self._client:
+            result = self._client.rpc(
+                "hybrid_match_chunks",
+                {
+                    "query_embedding": query_embedding,
+                    "query_embedding_bge": query_embedding_bge,
+                    "query_text": query_text,
+                    "filter_team_id": workspace_id,
+                    "match_count": top_k,
+                },
+            ).execute()
+            return result.data or []
+
+        # In-memory fallback (tests/dev): delegate to cosine-only search
+        return self.search_chunks(user_id=user_id, query_embedding=query_embedding, top_k=top_k)
+
+    def get_agents_for_team(self, team_id: str) -> list[dict[str, Any]]:
+        if self._client:
+            result = (
+                self._client.table("agents")
+                .select("role, model_provider, model_name, system_prompt, response_style, position")
+                .eq("team_id", team_id)
+                .order("position", desc=False)
+                .execute()
+            )
+            return result.data or []
+        return []
 
     def save_query(
         self,
@@ -285,29 +324,36 @@ class SupabaseRepository:
         return rows[:limit]
 
     def list_dashboard_metrics(self, user_id: str, session_id: str, days: int = 7) -> dict[str, Any]:
-        rows = self.list_queries(user_id=user_id, session_id=session_id, limit=500)
-        total_queries = len(rows)
-        avg_response_ms = int(sum(int(row.get("response_time_ms", 0)) for row in rows) / total_queries) if total_queries else 0
-        avg_overall_score = (
-            round(sum(float(row.get("overall_score", 0.0) or 0.0) for row in rows) / total_queries, 2) if total_queries else 0.0
-        )
+        all_rows = self.list_queries(user_id=user_id, session_id=session_id, limit=500)
 
         now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(days=days)
         per_day: dict[str, int] = {}
         for day_offset in range(days - 1, -1, -1):
             day = now.date() - timedelta(days=day_offset)
             per_day[day.isoformat()] = 0
 
-        for row in rows:
+        rows = []
+        for row in all_rows:
             created_at = row.get("created_at")
             if not created_at:
                 continue
             try:
-                day_key = datetime.fromisoformat(str(created_at).replace("Z", "+00:00")).date().isoformat()
+                ts = datetime.fromisoformat(str(created_at).replace("Z", "+00:00"))
             except ValueError:
                 continue
+            if ts < cutoff:
+                continue
+            rows.append(row)
+            day_key = ts.date().isoformat()
             if day_key in per_day:
                 per_day[day_key] += 1
+
+        total_queries = len(rows)
+        avg_response_ms = int(sum(int(row.get("response_time_ms", 0)) for row in rows) / total_queries) if total_queries else 0
+        avg_overall_score = (
+            round(sum(float(row.get("overall_score", 0.0) or 0.0) for row in rows) / total_queries, 2) if total_queries else 0.0
+        )
 
         return {
             "total_queries": total_queries,

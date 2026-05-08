@@ -6,10 +6,29 @@ FROM python:3.11-slim AS deps
 WORKDIR /app
 
 COPY requirements.txt .
+RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr && rm -rf /var/lib/apt/lists/*
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements.txt
 
-# ── stage 2: production image ──────────────────────────────────────────────────
+# ── stage 2: test runner ───────────────────────────────────────────────────────
+FROM deps AS test
+
+WORKDIR /app
+
+# pre-download both embedding models during build so tests run fully offline
+RUN python -c "\
+from sentence_transformers import SentenceTransformer; \
+SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2'); \
+SentenceTransformer('BAAI/bge-base-en-v1.5')"
+
+COPY . .
+
+ENV TRANSFORMERS_OFFLINE=1 \
+    HF_DATASETS_OFFLINE=1
+
+CMD ["pytest", "-q", "--tb=short"]
+
+# ── stage 3: production image ──────────────────────────────────────────────────
 FROM python:3.11-slim AS final
 
 WORKDIR /app

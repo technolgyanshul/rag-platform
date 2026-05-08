@@ -53,10 +53,9 @@ class GroqClient:
                     )
                     break
 
-        return (
-            "Model provider is temporarily unavailable. "
-            "Please retry your query in a few moments."
-        )
+        logger.warning("groq_unavailable_falling_back_to_sarvam", extra={"model": model, **event_meta})
+        from llms.sarvam_client import SarvamClient
+        return SarvamClient().chat(messages=messages, metadata=metadata)
 
     def _chat_with_timeout(self, messages: list[dict], model: str) -> str:
         with ThreadPoolExecutor(max_workers=1) as pool:

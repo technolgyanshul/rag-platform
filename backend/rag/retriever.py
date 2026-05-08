@@ -4,7 +4,7 @@ from typing import Any
 
 from core.config import get_settings
 from db.supabase import SupabaseRepository
-from rag.embeddings import embed_text
+from rag.embeddings import embed_text, embed_text_bge
 
 
 def retrieve_chunks(query: str, user_id: str, top_k: int | None = None) -> list[dict[str, Any]]:
@@ -16,8 +16,15 @@ def retrieve_chunks(query: str, user_id: str, top_k: int | None = None) -> list[
     if not query.strip():
         raise ValueError("query must not be empty")
     query_embedding = embed_text(query)
+    query_embedding_bge = embed_text_bge(query)
     repository = SupabaseRepository()
-    rows = repository.search_chunks(user_id=user_id, query_embedding=query_embedding, top_k=top_k)
+    rows = repository.hybrid_search_chunks(
+        user_id=user_id,
+        query_embedding=query_embedding,
+        query_embedding_bge=query_embedding_bge,
+        query_text=query,
+        top_k=top_k,
+    )
     return rows
 
 

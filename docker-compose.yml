@@ -25,3 +25,16 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
+  test:
+    build:
+      context: ./backend
+      target: test
+    env_file:
+      - .env
+    environment:
+      - ALLOW_INMEMORY_REPOSITORY=true
+      - TRANSFORMERS_OFFLINE=1
+      - HF_DATASETS_OFFLINE=1
+    profiles:
+      - test

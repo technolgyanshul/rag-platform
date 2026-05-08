@@ -14,6 +14,7 @@ def run_synthesizer(
     critic_output: str,
     sources: list[dict],
     model_name: str = DEFAULT_SYNTHESIZER_MODEL,
+    system_prompt: str | None = None,
 ) -> str:
     source_refs = ", ".join(f"{source.get('filename')}#{source.get('chunk_index')}" for source in sources)
     prompt = render_prompt(
@@ -25,9 +26,13 @@ def run_synthesizer(
             "critic_output": critic_output,
         },
     )
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
     client = GroqClient()
     return client.chat(
-        messages=[{"role": "user", "content": prompt}],
+        messages=messages,
         model=model_name,
         metadata={"prompt_version": get_settings().rag_prompt_version, "agent": "Synthesizer"},
     )
