@@ -5,9 +5,8 @@ import time
 from collections import OrderedDict
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
 from core.auth import AuthUser, get_current_user
@@ -33,6 +32,14 @@ class IngestResponse(BaseModel):
     chunks_created: int
 
 
+class DocumentListItem(BaseModel):
+    id: str
+    filename: str
+    file_type: str
+    chunk_count: int
+    uploaded_at: str
+
+
 _INGEST_IDEMPOTENCY_CACHE: OrderedDict[str, tuple[float, IngestResponse]] = OrderedDict()
 
 
@@ -51,20 +58,26 @@ async def ingest(
     request: Request,
     auth_user: AuthUser = Depends(get_current_user),
     file: UploadFile = File(...),
-    team_id: UUID = Form(...),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> IngestResponse:
     request_id = getattr(request.state, "request_id", "unknown")
     _evict_old_idempotency_entries()
 
-    if idempotency_key and idempotency_key in _INGEST_IDEMPOTENCY_CACHE:
-        _, cached = _INGEST_IDEMPOTENCY_CACHE[idempotency_key]
-        logger.info("ingest_request_idempotent_replay", extra={"request_id": request_id, "team_id": str(team_id)})
+    cache_key = f"{auth_user.user_id}:{idempotency_key}" if idempotency_key else None
+    if cache_key and cache_key in _INGEST_IDEMPOTENCY_CACHE:
+        _, cached = _INGEST_IDEMPOTENCY_CACHE[cache_key]
+        logger.info("ingest_request_idempotent_replay", extra={"request_id": request_id, "user_id": auth_user.user_id})
         return cached
 
     extension = Path(file.filename or "").suffix.lower().replace(".", "")
     if extension not in ALLOWED_FILE_TYPES:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {extension}")
+
+    try:
+        repository = SupabaseRepository()
+    except Exception as error:
+        logger.exception("ingest_repository_unavailable", extra={"request_id": request_id, "user_id": auth_user.user_id})
+        raise HTTPException(status_code=503, detail="Document persistence temporarily unavailable") from error
 
     payload = await file.read()
     size_in_mb = len(payload) / (1024 * 1024)
@@ -87,11 +100,9 @@ async def ingest(
         Path(temp_path).unlink(missing_ok=True)
 
     chunks = ingestion_result["chunks"]
-    repository = SupabaseRepository()
     try:
         document_row = repository.insert_document(
             user_id=auth_user.user_id,
-            team_id=str(team_id),
             filename=file.filename or "untitled",
             file_type=extension,
             chunk_count=len(chunks),
@@ -100,7 +111,7 @@ async def ingest(
     except PermissionError as error:
         raise HTTPException(status_code=403, detail=str(error)) from error
     except Exception as error:
-        logger.exception("ingest_request_persistence_failed", extra={"request_id": request_id, "team_id": str(team_id)})
+        logger.exception("ingest_request_persistence_failed", extra={"request_id": request_id, "user_id": auth_user.user_id})
         raise HTTPException(status_code=503, detail="Document persistence temporarily unavailable") from error
 
     response = IngestResponse(
@@ -109,24 +120,24 @@ async def ingest(
         file_type=extension,
         chunks_created=len(chunks),
     )
-    if idempotency_key:
-        _INGEST_IDEMPOTENCY_CACHE[idempotency_key] = (time.time(), response)
+    if cache_key:
+        _INGEST_IDEMPOTENCY_CACHE[cache_key] = (time.time(), response)
     _evict_old_idempotency_entries()
     return response
 
 
-@router.get("/documents")
+@router.get("/documents", response_model=list[DocumentListItem])
 def list_documents(
     request: Request,
     auth_user: AuthUser = Depends(get_current_user),
-    team_id: UUID = Query(...),
-) -> list[dict[str, object]]:
+) -> list[DocumentListItem]:
     request_id = getattr(request.state, "request_id", "unknown")
-    repository = SupabaseRepository()
     try:
-        return repository.list_documents(user_id=auth_user.user_id, team_id=str(team_id))
+        repository = SupabaseRepository()
+        rows = repository.list_documents(user_id=auth_user.user_id)
     except PermissionError as error:
         raise HTTPException(status_code=403, detail=str(error)) from error
     except Exception as error:
-        logger.exception("ingest_documents_list_failed", extra={"request_id": request_id, "team_id": str(team_id)})
+        logger.exception("ingest_documents_list_failed", extra={"request_id": request_id, "user_id": auth_user.user_id})
         raise HTTPException(status_code=503, detail="Document listing temporarily unavailable") from error
+    return [DocumentListItem(**row) for row in rows]

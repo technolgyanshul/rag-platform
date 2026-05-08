@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import { ProtectedPage } from "../../components/auth/ProtectedPage";
 import { AppShell } from "../../components/layout/AppShell";
-import { supabase } from "../../lib/supabase";
+import { createClient } from "@/utils/supabase/client";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -15,6 +15,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const loadUser = async () => {
+      const supabase = createClient();
       const {
         data: { user },
         error
@@ -34,7 +35,7 @@ export default function ProfilePage() {
   }, []);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await createClient().auth.signOut();
     router.push("/login");
   };
 
@@ -42,7 +43,7 @@ export default function ProfilePage() {
     <ProtectedPage>
       <AppShell
         title="User Profile"
-        subtitle="Manage identity metadata and active account access"
+        subtitle="Manage active account access"
         actions={
           <button type="button" onClick={handleLogout}>
             Log out
@@ -53,24 +54,12 @@ export default function ProfilePage() {
           <div className="card">
             <h3 style={{ marginBottom: 8 }}>Operator Identity</h3>
             {loading ? <p className="status-message">Loading profile...</p> : <p>Email: {email || "Unavailable"}</p>}
-            <p className="status-message" style={{ marginTop: 10 }}>
-              Role: Senior Operator
-            </p>
-            <p className="status-message">Environment: Light Theme Console</p>
+            <p className="status-message" style={{ marginTop: 10 }}>Identity data is sourced from your current Supabase session.</p>
           </div>
 
           <div className="card">
-            <h3 style={{ marginBottom: 8 }}>Security Protocol</h3>
-            <ul className="history-list">
-              <li className="history-item">
-                <strong>Two-Factor Authentication</strong>
-                <p className="status-message">Recommended for admin-level accounts.</p>
-              </li>
-              <li className="history-item">
-                <strong>API Tokens</strong>
-                <p className="status-message">Rotate service tokens every 30 days.</p>
-              </li>
-            </ul>
+            <h3 style={{ marginBottom: 8 }}>Session</h3>
+            <p className="status-message">Use the logout action to revoke the local browser session.</p>
           </div>
         </div>
         {message ? <p className="status-message">{message}</p> : null}

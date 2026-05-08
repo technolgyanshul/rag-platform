@@ -61,3 +61,9 @@ export type DashboardMetrics = {
   average_overall_score: number;
   queries_over_time: Array<{ date: string; count: number }>;
 };
+
+export type SessionRecord = {
+  id: string;
+  title: string | null;
+  created_at: string;
+};

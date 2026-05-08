@@ -3,40 +3,69 @@
 import { FormEvent, useState } from "react";
 
 type QueryInputProps = {
-  onSubmit: (payload: { teamId: string; sessionId: string; query: string; topK: number }) => Promise<void>;
+  onSubmit: (payload: { sessionId: string; query: string; topK: number }) => Promise<void>;
+  onCreateSession: () => Promise<string>;
   disabled?: boolean;
 };
 
-export function QueryInput({ onSubmit, disabled = false }: QueryInputProps) {
-  const [teamId, setTeamId] = useState("");
+export function QueryInput({ onSubmit, onCreateSession, disabled = false }: QueryInputProps) {
   const [sessionId, setSessionId] = useState("");
   const [query, setQuery] = useState("");
   const [topK, setTopK] = useState(5);
+  const [sessionMessage, setSessionMessage] = useState("");
+
+  const handleCreateSession = async () => {
+    try {
+      setSessionMessage("Creating session...");
+      const createdSessionId = await onCreateSession();
+      setSessionId(createdSessionId);
+      setSessionMessage("Session created.");
+    } catch (error) {
+      setSessionMessage(error instanceof Error ? error.message : "Could not create session.");
+    }
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!teamId.trim() || !sessionId.trim() || !query.trim()) {
+    if (!query.trim()) {
       return;
     }
-    await onSubmit({ teamId: teamId.trim(), sessionId: sessionId.trim(), query: query.trim(), topK });
+
+    let nextSessionId = sessionId.trim();
+    if (!nextSessionId) {
+      try {
+        setSessionMessage("Creating session...");
+        nextSessionId = await onCreateSession();
+        setSessionId(nextSessionId);
+        setSessionMessage("");
+      } catch (error) {
+        setSessionMessage(error instanceof Error ? error.message : "Could not create session.");
+        return;
+      }
+    }
+
+    if (!nextSessionId) {
+      return;
+    }
+    await onSubmit({ sessionId: nextSessionId, query: query.trim(), topK });
   };
 
   return (
     <form className="auth-form" onSubmit={handleSubmit}>
       <div className="split-3">
-        <label htmlFor="chat-team-id">
-          Team ID
-          <input id="chat-team-id" value={teamId} onChange={(event) => setTeamId(event.target.value)} placeholder="Team UUID" />
-        </label>
-
         <label htmlFor="chat-session-id">
           Session ID
-          <input
-            id="chat-session-id"
-            value={sessionId}
-            onChange={(event) => setSessionId(event.target.value)}
-            placeholder="Session UUID"
-          />
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              id="chat-session-id"
+              value={sessionId}
+              onChange={(event) => setSessionId(event.target.value)}
+              placeholder="Session UUID"
+            />
+            <button type="button" onClick={() => void handleCreateSession()} disabled={disabled}>
+              Create
+            </button>
+          </div>
         </label>
 
         <label htmlFor="chat-top-k">
@@ -51,6 +80,8 @@ export function QueryInput({ onSubmit, disabled = false }: QueryInputProps) {
           />
         </label>
       </div>
+
+      {sessionMessage ? <p className="status-message">{sessionMessage}</p> : null}
 
       <label htmlFor="chat-query">
         Question

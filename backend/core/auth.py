@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 
 import requests
 from fastapi import Header, HTTPException
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -26,7 +30,11 @@ def get_current_user(authorization: str | None = Header(default=None)) -> AuthUs
     token = _extract_bearer_token(authorization)
 
     supabase_url = os.getenv("SUPABASE_URL")
-    supabase_anon_key = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_KEY")
+    supabase_anon_key = os.getenv("SUPABASE_ANON_KEY")
+    if not supabase_anon_key:
+        supabase_anon_key = os.getenv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+        if supabase_anon_key:
+            logger.warning("Using frontend Supabase key for backend auth; set SUPABASE_ANON_KEY for production")
     if not supabase_url or not supabase_anon_key:
         raise HTTPException(status_code=503, detail="Auth is not configured")
 

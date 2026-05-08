@@ -1,9 +1,10 @@
-import { DashboardMetrics, QueryHistoryItem, QueryResponse } from "./types";
-import { supabase } from "./supabase";
+import { DashboardMetrics, QueryHistoryItem, QueryResponse, SessionRecord } from "./types";
+import { createClient } from "@/utils/supabase/client";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 async function buildAuthHeaders(base?: HeadersInit): Promise<HeadersInit> {
+  const supabase = createClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -25,16 +26,14 @@ export type IngestResponse = {
 
 export type DocumentRow = {
   id: string;
-  team_id: string;
   filename: string;
   file_type: string;
   chunk_count: number;
   uploaded_at: string;
 };
 
-export async function uploadKnowledgeFile(teamId: string, file: File): Promise<IngestResponse> {
+export async function uploadKnowledgeFile(file: File): Promise<IngestResponse> {
   const formData = new FormData();
-  formData.append("team_id", teamId);
   formData.append("file", file);
 
   const response = await fetch(`${API_BASE_URL}/ingest`, {
@@ -52,8 +51,8 @@ export async function uploadKnowledgeFile(teamId: string, file: File): Promise<I
   return response.json();
 }
 
-export async function listKnowledgeDocuments(teamId: string): Promise<DocumentRow[]> {
-  const response = await fetch(`${API_BASE_URL}/ingest/documents?team_id=${encodeURIComponent(teamId)}`, {
+export async function listKnowledgeDocuments(): Promise<DocumentRow[]> {
+  const response = await fetch(`${API_BASE_URL}/ingest/documents`, {
     headers: await buildAuthHeaders(),
   });
   if (!response.ok) {
@@ -64,7 +63,6 @@ export async function listKnowledgeDocuments(teamId: string): Promise<DocumentRo
 
 export async function runQuery(payload: {
   query: string;
-  team_id: string;
   session_id: string;
   top_k?: number;
 }): Promise<QueryResponse> {
@@ -77,6 +75,21 @@ export async function runQuery(payload: {
   if (!response.ok) {
     const errorBody = await response.json().catch(() => null);
     throw new Error(errorBody?.detail ?? "Query failed");
+  }
+
+  return response.json();
+}
+
+export async function createSession(title?: string): Promise<SessionRecord> {
+  const response = await fetch(`${API_BASE_URL}/sessions`, {
+    method: "POST",
+    headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ title }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.detail ?? "Could not create session");
   }
 
   return response.json();

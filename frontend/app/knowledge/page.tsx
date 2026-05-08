@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { ProtectedPage } from "../../components/auth/ProtectedPage";
 import { UploadPanel } from "../../components/knowledge/UploadPanel";
@@ -8,56 +8,37 @@ import { AppShell } from "../../components/layout/AppShell";
 import { DocumentRow, listKnowledgeDocuments } from "../../lib/api";
 
 export default function KnowledgePage() {
-  const [teamId, setTeamId] = useState("");
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
-  const [message, setMessage] = useState("Enter a team ID to load or upload documents.");
+  const [message, setMessage] = useState("Upload a document to populate the demo knowledge base.");
 
   const refreshDocuments = async () => {
-    if (!teamId.trim()) {
-      return;
-    }
-
     try {
-      const rows = await listKnowledgeDocuments(teamId.trim());
+      const rows = await listKnowledgeDocuments();
       setDocuments(rows);
       setMessage(rows.length ? "" : "No documents uploaded yet.");
     } catch (_error) {
-      setMessage("Could not load documents for this team.");
+      setMessage("Could not load uploaded documents.");
     }
   };
 
-  useEffect(() => {
-    void refreshDocuments();
-  }, []);
-
   return (
     <ProtectedPage>
-      <AppShell
-        title="Knowledge Base Management"
-        subtitle="Upload, inspect, and sync team documents used by retrieval"
-        actions={
-          <button type="button" onClick={() => void refreshDocuments()} disabled={!teamId.trim()}>
+        <AppShell
+          title="Knowledge Base Management"
+          subtitle="Upload, inspect, and sync documents used by retrieval"
+          actions={
+          <button type="button" onClick={() => void refreshDocuments()}>
             Refresh Documents
           </button>
         }
       >
         <div className="split-2">
           <div className="card">
-            <label htmlFor="team-id">
-              Team ID
-              <input
-                id="team-id"
-                type="text"
-                value={teamId}
-                onChange={(event) => setTeamId(event.target.value)}
-                placeholder="Enter your team UUID"
-              />
-            </label>
             <p className="status-message" style={{ marginTop: 10 }}>
-              Use one team context for upload + retrieval + analytics.
+              This demo uses your signed-in account as the workspace context for uploads, chat, and analytics.
             </p>
           </div>
-          <UploadPanel teamId={teamId.trim()} onUploaded={() => void refreshDocuments()} />
+          <UploadPanel onUploaded={() => void refreshDocuments()} />
         </div>
 
         <div className="card">

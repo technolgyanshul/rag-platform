@@ -18,7 +18,7 @@ services:
     env_file:
       - .env
     environment:
-      - WATCHPACK_POLLING=true
+      - WATCHPACK_POLLING=true # check for later
     volumes:
       - ./frontend:/app
       - /app/node_modules

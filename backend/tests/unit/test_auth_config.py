@@ -13,7 +13,7 @@ class _Response:
 def test_get_current_user_prefers_backend_anon_key(monkeypatch) -> None:
     monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setenv("SUPABASE_ANON_KEY", "backend-anon")
-    monkeypatch.setenv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "frontend-anon")
+    monkeypatch.setenv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "frontend-publishable")
 
     def _fake_get(_url: str, headers: dict[str, str], timeout: int) -> _Response:
         assert headers["apikey"] == "backend-anon"

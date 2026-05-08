@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 class QueryRequest(BaseModel):
     query: str = Field(min_length=1, max_length=get_settings().max_query_length)
-    team_id: UUID
     session_id: UUID
     top_k: int | None = Field(default=None, ge=1, le=20)
 
@@ -68,14 +67,12 @@ class QueryHistoryItem(BaseModel):
 @router.post("", response_model=QueryResponse)
 def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser = Depends(get_current_user)) -> QueryResponse:
     settings = get_settings()
-    repository = SupabaseRepository()
     request_id = getattr(request.state, "request_id", "unknown")
     query_start = time.perf_counter()
     logger.info(
         "query_request_started",
         extra={
             "request_id": request_id,
-            "team_id": str(payload.team_id),
             "session_id": str(payload.session_id),
             "user_id": auth_user.user_id,
             "top_k": payload.top_k,
@@ -84,9 +81,17 @@ def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser = Dep
 
     selected_top_k = payload.top_k or settings.top_k
     try:
+        repository = SupabaseRepository()
+        session = repository.get_session(user_id=auth_user.user_id, session_id=str(payload.session_id))
+        if session is None:
+            repository.create_session(
+                user_id=auth_user.user_id,
+                session_id=str(payload.session_id),
+                title="Chat session",
+            )
+
         rows = retrieve_chunks(
             query=payload.query,
-            team_id=str(payload.team_id),
             user_id=auth_user.user_id,
             top_k=selected_top_k,
         )
@@ -97,7 +102,7 @@ def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser = Dep
     except PermissionError as error:
         raise HTTPException(status_code=403, detail=str(error)) from error
     except Exception as error:
-        logger.exception("query_request_retrieval_failed", extra={"request_id": request_id, "team_id": str(payload.team_id)})
+        logger.exception("query_request_retrieval_failed", extra={"request_id": request_id, "user_id": auth_user.user_id})
         raise HTTPException(status_code=503, detail="Retrieval temporarily unavailable") from error
 
     if not sources:
@@ -169,8 +174,8 @@ def query_history(
     limit: int = Query(get_settings().query_history_limit_default, ge=1, le=get_settings().query_history_limit_max),
 ) -> list[QueryHistoryItem]:
     request_id = getattr(request.state, "request_id", "unknown")
-    repository = SupabaseRepository()
     try:
+        repository = SupabaseRepository()
         rows = repository.list_queries(session_id=str(session_id), user_id=auth_user.user_id, limit=limit)
     except PermissionError as error:
         raise HTTPException(status_code=403, detail=str(error)) from error

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { supabase } from "../../lib/supabase";
+import { createClient } from "@/utils/supabase/client";
 
 type ProtectedPageProps = {
   children: React.ReactNode;
@@ -15,6 +15,7 @@ export function ProtectedPage({ children }: ProtectedPageProps) {
 
   useEffect(() => {
     const checkSession = async () => {
+      const supabase = createClient();
       const { data, error } = await supabase.auth.getSession();
       if (error || !data.session) {
         router.replace("/login");

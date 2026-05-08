@@ -13,14 +13,22 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class _FallbackStore:
+    sessions: list[dict[str, Any]] = field(default_factory=list)
     documents: list[dict[str, Any]] = field(default_factory=list)
     chunks: list[dict[str, Any]] = field(default_factory=list)
     queries: list[dict[str, Any]] = field(default_factory=list)
     agent_traces: list[dict[str, Any]] = field(default_factory=list)
-    session_logs: list[dict[str, Any]] = field(default_factory=list)
 
 
 _FALLBACK = _FallbackStore()
+
+
+def reset_fallback_store() -> None:
+    _FALLBACK.sessions.clear()
+    _FALLBACK.documents.clear()
+    _FALLBACK.chunks.clear()
+    _FALLBACK.queries.clear()
+    _FALLBACK.agent_traces.clear()
 
 
 class SupabaseRepository:
@@ -43,31 +51,93 @@ class SupabaseRepository:
         if self._client is None and not self._allow_inmemory:
             raise RuntimeError("Supabase is unavailable and in-memory repository fallback is disabled")
 
-    def _ensure_team_owned(self, team_id: str, user_id: str) -> None:
-        if self._client:
-            result = self._client.table("teams").select("id").eq("id", team_id).eq("user_id", user_id).limit(1).execute()
-            if not result.data:
-                raise PermissionError("Team is not accessible for this user")
-            return
+    def _workspace_id_for_user(self, user_id: str) -> str:
+        return user_id
 
-        # Fallback mode cannot verify ownership against auth.users table. Require explicit UUID-like ids and allow tests.
-        _ = (team_id, user_id)
+    def _ensure_workspace(self, user_id: str) -> str:
+        workspace_id = self._workspace_id_for_user(user_id)
+        if self._client:
+            result = self._client.table("teams").select("id").eq("id", workspace_id).eq("user_id", user_id).limit(1).execute()
+            if result.data:
+                return workspace_id
+
+            payload = {
+                "id": workspace_id,
+                "user_id": user_id,
+                "name": "Demo Workspace",
+                "domain": None,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            result = self._client.table("teams").insert(payload).execute()
+            if result.data:
+                return str(result.data[0].get("id", workspace_id))
+            raise RuntimeError("Failed to create demo workspace")
+
+        return workspace_id
+
+    def _find_fallback_session(self, session_id: str) -> dict[str, Any] | None:
+        for row in _FALLBACK.sessions:
+            if row["id"] == session_id:
+                return row
+        return None
 
     def _ensure_session_owned(self, session_id: str, user_id: str) -> None:
+        session = self.get_session(user_id=user_id, session_id=session_id)
+        if session is None:
+            raise PermissionError("Session is not accessible for this user")
+
+    def get_session(self, user_id: str, session_id: str) -> dict[str, Any] | None:
         if self._client:
-            result = self._client.table("sessions").select("id").eq("id", session_id).eq("user_id", user_id).limit(1).execute()
+            result = self._client.table("sessions").select("*").eq("id", session_id).limit(1).execute()
             if not result.data:
+                return None
+            row = result.data[0]
+            if str(row.get("user_id", "")) != user_id:
                 raise PermissionError("Session is not accessible for this user")
-            return
+            return row
 
-        _ = (session_id, user_id)
+        row = self._find_fallback_session(session_id)
+        if row is None:
+            return None
+        if str(row.get("user_id", "")) != user_id:
+            raise PermissionError("Session is not accessible for this user")
+        return row
 
-    def insert_document(self, user_id: str, team_id: str, filename: str, file_type: str, chunk_count: int) -> dict[str, Any]:
-        self._ensure_team_owned(team_id=team_id, user_id=user_id)
+    def create_session(
+        self,
+        user_id: str,
+        title: str | None = None,
+        session_id: str | None = None,
+    ) -> dict[str, Any]:
+        workspace_id = self._ensure_workspace(user_id)
+        payload = {
+            "id": session_id or str(uuid4()),
+            "user_id": user_id,
+            "team_id": workspace_id,
+            "title": title,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
 
+        if self._client:
+            result = self._client.table("sessions").insert(payload).execute()
+            if result.data:
+                return result.data[0]
+            raise RuntimeError("Failed to create session")
+
+        existing = self._find_fallback_session(payload["id"])
+        if existing:
+            if str(existing.get("user_id", "")) != user_id:
+                raise PermissionError("Session is not accessible for this user")
+            return existing
+
+        _FALLBACK.sessions.append(payload)
+        return payload
+
+    def insert_document(self, user_id: str, filename: str, file_type: str, chunk_count: int) -> dict[str, Any]:
+        workspace_id = self._ensure_workspace(user_id)
         payload = {
             "id": str(uuid4()),
-            "team_id": team_id,
+            "team_id": workspace_id,
             "filename": filename,
             "file_type": file_type,
             "chunk_count": chunk_count,
@@ -101,29 +171,29 @@ class SupabaseRepository:
         for row in rows:
             _FALLBACK.chunks.append({"id": str(uuid4()), **row, "created_at": datetime.now(timezone.utc).isoformat()})
 
-    def list_documents(self, user_id: str, team_id: str) -> list[dict[str, Any]]:
-        self._ensure_team_owned(team_id=team_id, user_id=user_id)
+    def list_documents(self, user_id: str) -> list[dict[str, Any]]:
+        workspace_id = self._ensure_workspace(user_id)
         if self._client:
-            result = self._client.table("documents").select("*").eq("team_id", team_id).order("uploaded_at", desc=True).execute()
+            result = self._client.table("documents").select("*").eq("team_id", workspace_id).order("uploaded_at", desc=True).execute()
             return result.data or []
 
-        docs = [doc for doc in _FALLBACK.documents if doc["team_id"] == team_id]
+        docs = [doc for doc in _FALLBACK.documents if doc["team_id"] == workspace_id]
         return sorted(docs, key=lambda item: item["uploaded_at"], reverse=True)
 
-    def search_chunks(self, user_id: str, team_id: str, query_embedding: list[float], top_k: int = 5) -> list[dict[str, Any]]:
-        self._ensure_team_owned(team_id=team_id, user_id=user_id)
+    def search_chunks(self, user_id: str, query_embedding: list[float], top_k: int = 5) -> list[dict[str, Any]]:
+        workspace_id = self._ensure_workspace(user_id)
         if self._client:
             result = self._client.rpc(
                 "match_chunks",
                 {
                     "query_embedding": query_embedding,
-                    "filter_team_id": team_id,
+                    "filter_team_id": workspace_id,
                     "match_count": top_k,
                 },
             ).execute()
             return result.data or []
 
-        document_map = {document["id"]: document for document in _FALLBACK.documents if document["team_id"] == team_id}
+        document_map = {document["id"]: document for document in _FALLBACK.documents if document["team_id"] == workspace_id}
         scored_rows: list[dict[str, Any]] = []
         for chunk in _FALLBACK.chunks:
             document = document_map.get(chunk["document_id"])
@@ -196,32 +266,6 @@ class SupabaseRepository:
 
         for row in rows:
             _FALLBACK.agent_traces.append({"id": str(uuid4()), **row, "created_at": datetime.now(timezone.utc).isoformat()})
-
-    def save_session_log(
-        self,
-        session_id: str,
-        team_id: str,
-        event_type: str,
-        payload: dict[str, Any] | None = None,
-        request_id: str | None = None,
-    ) -> dict[str, Any]:
-        row = {
-            "id": str(uuid4()),
-            "session_id": session_id,
-            "team_id": team_id,
-            "event_type": event_type,
-            "request_id": request_id,
-            "payload": payload or {},
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-
-        if self._client:
-            result = self._client.table("session_logs").insert(row).execute()
-            if result.data:
-                return result.data[0]
-
-        _FALLBACK.session_logs.append(row)
-        return row
 
     def list_queries(self, user_id: str, session_id: str, limit: int = 50) -> list[dict[str, Any]]:
         self._ensure_session_owned(session_id=session_id, user_id=user_id)

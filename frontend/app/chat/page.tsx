@@ -9,18 +9,17 @@ import { QueryInput } from "../../components/chat/QueryInput";
 import { ScoreCard } from "../../components/chat/ScoreCard";
 import { SourceList } from "../../components/chat/SourceList";
 import { AppShell } from "../../components/layout/AppShell";
-import { runQuery } from "../../lib/api";
+import { createSession, runQuery } from "../../lib/api";
 import { QueryResponse, QueryUiState } from "../../lib/types";
 
 export default function ChatPage() {
   const [queryState, setQueryState] = useState<QueryUiState>({ status: "idle" });
 
-  const handleSubmit = async (payload: { teamId: string; sessionId: string; query: string; topK: number }) => {
+  const handleSubmit = async (payload: { sessionId: string; query: string; topK: number }) => {
     setQueryState({ status: "loading" });
     try {
       const result = await runQuery({
         query: payload.query,
-        team_id: payload.teamId,
         session_id: payload.sessionId,
         top_k: payload.topK,
       });
@@ -31,6 +30,11 @@ export default function ChatPage() {
         message: error instanceof Error ? error.message : "Query failed unexpectedly",
       });
     }
+  };
+
+  const handleCreateSession = async () => {
+    const row = await createSession("Chat session");
+    return row.id;
   };
 
   const response: QueryResponse | null = queryState.status === "success" ? queryState.data : null;
@@ -45,7 +49,11 @@ export default function ChatPage() {
           <div className="stack">
             <div className="card">
               <h3 style={{ marginBottom: 12 }}>Run Query</h3>
-              <QueryInput onSubmit={handleSubmit} disabled={queryState.status === "loading"} />
+              <QueryInput
+                onSubmit={handleSubmit}
+                onCreateSession={handleCreateSession}
+                disabled={queryState.status === "loading"}
+              />
             </div>
             <div className="card">
               <h3 style={{ marginBottom: 12 }}>Answer</h3>

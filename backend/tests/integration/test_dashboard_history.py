@@ -9,10 +9,8 @@ client = TestClient(app)
 
 def test_query_history_returns_saved_rows() -> None:
     repository = SupabaseRepository()
-    team_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     session_id = "33333333-3333-3333-3333-333333333333"
-    repository.create_team(user_id="00000000-0000-0000-0000-000000000001", team_id=team_id, name="Team History")
-    repository.create_session(user_id="00000000-0000-0000-0000-000000000001", team_id=team_id, session_id=session_id)
+    repository.create_session(user_id="00000000-0000-0000-0000-000000000001", session_id=session_id)
     row = repository.save_query(
         user_id="00000000-0000-0000-0000-000000000001",
         session_id=session_id,
@@ -31,10 +29,8 @@ def test_query_history_returns_saved_rows() -> None:
 
 def test_dashboard_metrics_returns_aggregates() -> None:
     repository = SupabaseRepository()
-    team_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
     session_id = "44444444-4444-4444-4444-444444444444"
-    repository.create_team(user_id="00000000-0000-0000-0000-000000000001", team_id=team_id, name="Team Metrics")
-    repository.create_session(user_id="00000000-0000-0000-0000-000000000001", team_id=team_id, session_id=session_id)
+    repository.create_session(user_id="00000000-0000-0000-0000-000000000001", session_id=session_id)
     repository.save_query(
         user_id="00000000-0000-0000-0000-000000000001",
         session_id=session_id,

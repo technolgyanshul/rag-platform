@@ -5,21 +5,16 @@ import { FormEvent, useState } from "react";
 import { uploadKnowledgeFile } from "../../lib/api";
 
 type UploadPanelProps = {
-  teamId: string;
   onUploaded: () => void;
 };
 
-export function UploadPanel({ teamId, onUploaded }: UploadPanelProps) {
+export function UploadPanel({ onUploaded }: UploadPanelProps) {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!teamId) {
-      setMessage("Enter a team ID first.");
-      return;
-    }
     if (!file) {
       setMessage("Please choose a file.");
       return;
@@ -28,7 +23,7 @@ export function UploadPanel({ teamId, onUploaded }: UploadPanelProps) {
     setLoading(true);
     setMessage("");
     try {
-      const response = await uploadKnowledgeFile(teamId, file);
+      const response = await uploadKnowledgeFile(file);
       setMessage(`Uploaded ${response.filename} with ${response.chunks_created} chunks.`);
       setFile(null);
       onUploaded();

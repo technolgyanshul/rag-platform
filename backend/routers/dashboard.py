@@ -33,8 +33,8 @@ def dashboard_metrics(
     days: int = Query(get_settings().dashboard_days_default, ge=1, le=get_settings().dashboard_days_max),
 ) -> DashboardMetricsResponse:
     request_id = getattr(request.state, "request_id", "unknown")
-    repository = SupabaseRepository()
     try:
+        repository = SupabaseRepository()
         payload = repository.list_dashboard_metrics(session_id=str(session_id), user_id=auth_user.user_id, days=days)
     except PermissionError as error:
         raise HTTPException(status_code=403, detail=str(error)) from error
