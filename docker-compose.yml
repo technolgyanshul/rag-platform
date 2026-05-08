@@ -36,5 +36,7 @@ services:
       - ALLOW_INMEMORY_REPOSITORY=true
       - TRANSFORMERS_OFFLINE=1
       - HF_DATASETS_OFFLINE=1
+      - SUPABASE_URL=
+      - SUPABASE_SERVICE_ROLE_KEY=
     profiles:
       - test

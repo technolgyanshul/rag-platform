@@ -51,11 +51,11 @@ export function QueryInput({ onSubmit, onCreateSession, disabled = false }: Quer
   };
 
   return (
-    <form className="auth-form" onSubmit={handleSubmit}>
-      <div className="split-3">
-        <label htmlFor="chat-session-id">
+    <form className="auth-form query-form" onSubmit={handleSubmit}>
+      <div className="query-form__controls">
+        <label className="form-field" htmlFor="chat-session-id">
           Session ID
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="query-form__session-row">
             <input
               id="chat-session-id"
               value={sessionId}
@@ -68,7 +68,7 @@ export function QueryInput({ onSubmit, onCreateSession, disabled = false }: Quer
           </div>
         </label>
 
-        <label htmlFor="chat-top-k">
+        <label className="form-field query-form__top-k" htmlFor="chat-top-k">
           Top K
           <input
             id="chat-top-k"
@@ -83,15 +83,15 @@ export function QueryInput({ onSubmit, onCreateSession, disabled = false }: Quer
 
       {sessionMessage ? <p className="status-message">{sessionMessage}</p> : null}
 
-      <label htmlFor="chat-query">
+      <label className="form-field" htmlFor="chat-query">
         Question
-      <textarea
-        id="chat-query"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        rows={4}
-        placeholder="Ask a question grounded in your uploaded files..."
-      />
+        <textarea
+          id="chat-query"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          rows={4}
+          placeholder="Ask a question grounded in your uploaded files..."
+        />
       </label>
 
       <button type="submit" disabled={disabled}>

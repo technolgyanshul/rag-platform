@@ -38,7 +38,7 @@ class SupabaseRepository:
 
         url = os.getenv("SUPABASE_URL")
         key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-        if url and key:
+        if url and key and not self._allow_inmemory:
             try:
                 from supabase import create_client
 

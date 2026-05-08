@@ -123,6 +123,11 @@ select:focus {
   gap: 10px;
 }
 
+.form-field {
+  display: grid;
+  gap: 6px;
+}
+
 .auth-form textarea {
   resize: vertical;
 }
@@ -486,6 +491,37 @@ select:focus {
   gap: 16px;
 }
 
+.query-form {
+  gap: 14px;
+}
+
+.query-form__controls {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(96px, 120px);
+  gap: 16px;
+  align-items: end;
+}
+
+.query-form__session-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.query-form__session-row button {
+  white-space: nowrap;
+}
+
+.query-form__top-k input {
+  width: 100%;
+}
+
+.query-form textarea {
+  width: 100%;
+  min-height: 112px;
+}
+
 .stack {
   display: grid;
   gap: 12px;
@@ -547,6 +583,11 @@ select:focus {
   .chat-layout,
   .split-2,
   .split-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .query-form__controls,
+  .query-form__session-row {
     grid-template-columns: 1fr;
   }
 
