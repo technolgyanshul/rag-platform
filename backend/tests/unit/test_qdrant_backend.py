@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from rag.qdrant_backend import QdrantVectorBackend
 from rag.vector_backend import VectorPoint
 
@@ -66,6 +68,7 @@ def test_upsert_payload_includes_isolation_fields_and_deterministic_ids() -> Non
     upsert_call = next(iter(client.upsert_calls), None)
     assert upsert_call is not None
     points = upsert_call["points"]
+    assert len(points) == 2
     assert points[0].id == points[1].id
     assert points[0].payload == {
         "user_id": "user-a",
@@ -111,10 +114,16 @@ def test_search_applies_user_id_filter_and_sorts_by_score() -> None:
 
     rows = backend.search(query_vector=[0.3, 0.4], user_id="user-a", top_k=2)
 
-    assert client.search_calls[0]["query_filter"].must[0].key == "user_id"
-    assert client.search_calls[0]["query_filter"].must[0].match.value == "user-a"
+    search_call = next(iter(client.search_calls), None)
+    assert search_call is not None
+    filter_conditions = search_call["query_filter"].must
+    assert len(filter_conditions) == 1
+    user_filter = filter_conditions[0]
+    assert user_filter.key == "user_id"
+    assert user_filter.match.value == "user-a"
+    assert len(rows) == 2
     assert [row.document_id for row in rows] == ["doc-high", "doc-low"]
-    assert rows[0].score == 0.9
+    assert rows[0].score == pytest.approx(0.9)
     assert rows[0].metadata == {"section": "intro"}
 
 

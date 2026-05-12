@@ -39,16 +39,23 @@ FROM python:3.11-slim AS final
 
 WORKDIR /app
 
+RUN groupadd --system app && \
+    useradd --system --gid app --home-dir /home/app --create-home app
+
+ENV HOME=/home/app
+
 # copy installed packages from deps stage (avoids re-downloading)
 COPY --from=deps /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=deps /usr/local/bin /usr/local/bin
 
 # only copy application source, not tests/docs
-COPY main.py .
-COPY llms/ ./llms/
-COPY core/ ./core/
-COPY db/ ./db/
-COPY rag/ ./rag/
-COPY routers/ ./routers/
+COPY --chown=app:app main.py .
+COPY --chown=app:app llms/ ./llms/
+COPY --chown=app:app core/ ./core/
+COPY --chown=app:app db/ ./db/
+COPY --chown=app:app rag/ ./rag/
+COPY --chown=app:app routers/ ./routers/
+
+USER app
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

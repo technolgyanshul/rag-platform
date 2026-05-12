@@ -1,3 +1,5 @@
+import pytest
+
 from rag.retriever import format_sources, retrieve_chunks
 from rag.vector_backend import RetrievedChunk
 
@@ -32,7 +34,7 @@ def test_retrieve_chunks_embeds_query_and_searches_qdrant(monkeypatch) -> None:
     assert FakeQdrantVectorBackend.calls == [{"query_vector": [0.2, 0.3], "user_id": user_id, "top_k": 1}]
     assert len(rows) == 1
     assert rows[0]["document_id"] == "doc-1"
-    assert rows[0]["similarity"] == 0.88
+    assert rows[0]["similarity"] == pytest.approx(0.88)
 
 
 def test_format_sources_includes_filename_and_chunk_index() -> None:
