@@ -10,7 +10,7 @@ pytestmark = pytest.mark.anyio
 
 
 async def _client() -> httpx.AsyncClient:
-    return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
+    return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test")
 
 
 async def test_query_returns_top_k_sources(monkeypatch) -> None:
