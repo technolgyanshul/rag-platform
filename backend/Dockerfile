@@ -5,7 +5,7 @@ FROM python:3.11-slim AS deps
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY --chmod=0444 requirements.txt .
 RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr && rm -rf /var/lib/apt/lists/*
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements.txt
@@ -21,13 +21,14 @@ from sentence_transformers import SentenceTransformer; \
 SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2'); \
 SentenceTransformer('BAAI/bge-base-en-v1.5')"
 
-COPY main.py .
+COPY --chmod=0444 main.py .
 COPY llms/ ./llms/
 COPY core/ ./core/
 COPY db/ ./db/
 COPY rag/ ./rag/
 COPY routers/ ./routers/
 COPY tests/ ./tests/
+RUN chmod -R a=rX /app
 
 ENV TRANSFORMERS_OFFLINE=1 \
     HF_DATASETS_OFFLINE=1
@@ -52,12 +53,13 @@ COPY --from=deps /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.
 COPY --from=deps /usr/local/bin /usr/local/bin
 
 # only copy application source, not tests/docs
-COPY --chown=app:app main.py .
+COPY --chown=app:app --chmod=0444 main.py .
 COPY --chown=app:app llms/ ./llms/
 COPY --chown=app:app core/ ./core/
 COPY --chown=app:app db/ ./db/
 COPY --chown=app:app rag/ ./rag/
 COPY --chown=app:app routers/ ./routers/
+RUN chmod -R a=rX /app
 
 USER app
 
