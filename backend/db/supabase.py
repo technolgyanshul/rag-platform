@@ -133,14 +133,40 @@ class SupabaseRepository:
         _FALLBACK.sessions.append(payload)
         return payload
 
-    def insert_document(self, user_id: str, filename: str, file_type: str, chunk_count: int) -> dict[str, Any]:
+    def insert_document(
+        self,
+        user_id: str,
+        filename: str,
+        file_type: str,
+        chunk_count: int,
+        storage_path: str | None = None,
+        content_type: str | None = None,
+        file_size_bytes: int | None = None,
+        file_sha256: str | None = None,
+        extracted_text_sha256: str | None = None,
+        chunking_config: dict[str, Any] | None = None,
+        embedding_model_version: str | None = None,
+        embedding_bge_model_version: str | None = None,
+        index_version: str | None = None,
+        document_id: str | None = None,
+    ) -> dict[str, Any]:
         workspace_id = self._ensure_workspace(user_id)
         payload = {
-            "id": str(uuid4()),
+            "id": document_id or str(uuid4()),
             "team_id": workspace_id,
             "filename": filename,
             "file_type": file_type,
             "chunk_count": chunk_count,
+            "storage_bucket": "knowledge-files",
+            "storage_path": storage_path,
+            "content_type": content_type,
+            "file_size_bytes": file_size_bytes if file_size_bytes is not None else 0,
+            "file_sha256": file_sha256,
+            "extracted_text_sha256": extracted_text_sha256,
+            "chunking_config": chunking_config or {"chunk_size": 1000, "chunk_overlap": 150},
+            "embedding_model_version": embedding_model_version,
+            "embedding_bge_model_version": embedding_bge_model_version,
+            "index_version": index_version,
             "uploaded_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -151,6 +177,101 @@ class SupabaseRepository:
 
         _FALLBACK.documents.append(payload)
         return payload
+
+    def find_document_by_fingerprint(
+        self,
+        user_id: str,
+        file_sha256: str,
+        chunking_config: dict[str, Any],
+        embedding_model_version: str | None,
+        embedding_bge_model_version: str | None,
+        index_version: str | None,
+    ) -> dict[str, Any] | None:
+        workspace_id = self._ensure_workspace(user_id)
+        if self._client:
+            query = (
+                self._client.table("documents")
+                .select("*")
+                .eq("team_id", workspace_id)
+                .eq("file_sha256", file_sha256)
+                .eq("chunking_config", chunking_config)
+            )
+            for column, value in (
+                ("embedding_model_version", embedding_model_version),
+                ("embedding_bge_model_version", embedding_bge_model_version),
+                ("index_version", index_version),
+            ):
+                query = query.is_(column, "null") if value is None else query.eq(column, value)
+
+            result = query.limit(1).execute()
+            if result.data:
+                return result.data[0]
+            return None
+
+        for document in _FALLBACK.documents:
+            if document.get("team_id") != workspace_id:
+                continue
+            if document.get("file_sha256") != file_sha256:
+                continue
+            if document.get("chunking_config") != chunking_config:
+                continue
+            if document.get("embedding_model_version") != embedding_model_version:
+                continue
+            if document.get("embedding_bge_model_version") != embedding_bge_model_version:
+                continue
+            if document.get("index_version") != index_version:
+                continue
+            return document
+        return None
+
+    def upload_document_file(self, storage_path: str, payload: bytes, content_type: str) -> None:
+        if not self._client:
+            return
+
+        self._client.storage.from_("knowledge-files").upload(
+            path=storage_path,
+            file=payload,
+            file_options={"content-type": content_type, "upsert": "false"},
+        )
+
+    def create_document_download_url(self, user_id: str, document_id: str, expires_in_seconds: int = 300) -> str:
+        workspace_id = self._ensure_workspace(user_id)
+        if self._client:
+            result = (
+                self._client.table("documents")
+                .select("id, team_id, storage_path")
+                .eq("id", document_id)
+                .eq("team_id", workspace_id)
+                .limit(1)
+                .execute()
+            )
+            if not result.data:
+                raise PermissionError("Document is not accessible for this user")
+
+            storage_path = result.data[0].get("storage_path")
+            if not storage_path:
+                raise ValueError("Document does not have a stored file")
+
+            response = self._client.storage.from_("knowledge-files").create_signed_url(
+                storage_path,
+                expires_in_seconds,
+            )
+            signed_url = _extract_signed_url(response)
+            if not signed_url:
+                raise RuntimeError("Failed to create signed document URL")
+            return signed_url
+
+        for document in _FALLBACK.documents:
+            if document.get("id") != document_id:
+                continue
+            if document.get("team_id") != workspace_id:
+                raise PermissionError("Document is not accessible for this user")
+            storage_path = document.get("storage_path")
+            if not storage_path:
+                raise ValueError("Document does not have a stored file")
+            return f"http://localhost/storage/v1/object/sign/knowledge-files/{storage_path}"
+
+        raise PermissionError("Document is not accessible for this user")
 
     def insert_chunks(self, document_id: str, chunks: list[dict[str, Any]]) -> None:
         rows = []
@@ -375,3 +496,24 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     if norm_a == 0.0 or norm_b == 0.0:
         return 0.0
     return dot / (norm_a * norm_b)
+
+
+def _extract_signed_url(response: Any) -> str | None:
+    if isinstance(response, dict):
+        for key in ("signedURL", "signedUrl", "signed_url"):
+            value = response.get(key)
+            if value:
+                return str(value)
+        data = response.get("data")
+        if isinstance(data, dict):
+            return _extract_signed_url(data)
+
+    for key in ("signedURL", "signedUrl", "signed_url"):
+        value = getattr(response, key, None)
+        if value:
+            return str(value)
+
+    data = getattr(response, "data", None)
+    if data is not None:
+        return _extract_signed_url(data)
+    return None

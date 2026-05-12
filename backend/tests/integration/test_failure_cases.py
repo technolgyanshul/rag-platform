@@ -27,6 +27,13 @@ def test_ingest_rejects_empty_payload() -> None:
     assert response.json()["detail"] == "Uploaded file is empty"
 
 
+def test_ingest_openapi_documents_error_responses() -> None:
+    schema = client.get("/openapi.json").json()
+
+    assert {"400", "403", "500", "503"}.issubset(schema["paths"]["/ingest"]["post"]["responses"])
+    assert {"403", "503"}.issubset(schema["paths"]["/ingest/documents"]["get"]["responses"])
+
+
 def test_query_history_requires_non_empty_session_id() -> None:
     response = client.get("/query/history", params={"session_id": "", "limit": 10})
 

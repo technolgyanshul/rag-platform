@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { listKnowledgeDocuments, uploadKnowledgeFile } from "./api";
+import { getDocumentDownloadUrl, listKnowledgeDocuments, uploadKnowledgeFile } from "./api";
 
 vi.mock("@/utils/supabase/client", () => ({
   createClient: vi.fn(() => ({
@@ -64,5 +64,28 @@ describe("listKnowledgeDocuments", () => {
     );
 
     await expect(listKnowledgeDocuments()).rejects.toThrow("Could not load documents");
+  });
+});
+
+describe("getDocumentDownloadUrl", () => {
+  it("returns signed URL and sends Authorization header", async () => {
+    const mockResponse = {
+      url: "https://storage.example.com/signed-url",
+      expires_in_seconds: 300,
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(mockResponse),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await getDocumentDownloadUrl("doc-1");
+
+    expect(result).toEqual(mockResponse);
+    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/ingest/documents/doc-1/download", {
+      headers: {
+        Authorization: "Bearer test-token",
+      },
+    });
   });
 });

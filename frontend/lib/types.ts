@@ -67,3 +67,8 @@ export type SessionRecord = {
   title: string | null;
   created_at: string;
 };
+
+export type DocumentDownloadResponse = {
+  url: string;
+  expires_in_seconds: number;
+};
