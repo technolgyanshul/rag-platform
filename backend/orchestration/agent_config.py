@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -18,7 +19,7 @@ _DEFAULTS: dict[str, AgentConfig] = {
     "researcher": AgentConfig(model_name=DEFAULT_RESEARCHER_MODEL, system_prompt=None),
     "critic":     AgentConfig(model_name=DEFAULT_CRITIC_MODEL,     system_prompt=None),
     "synthesizer":AgentConfig(model_name=DEFAULT_SYNTHESIZER_MODEL, system_prompt=None),
-    "judge":      AgentConfig(model_name="sarvam-judge-model",     system_prompt=None),
+    "judge":      AgentConfig(model_name=os.getenv("JUDGE_MODEL", "sarvam-judge-model"), system_prompt=None),
 }
 
 
