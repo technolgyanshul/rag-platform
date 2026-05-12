@@ -6,10 +6,10 @@ type ChatWindowProps = {
 
 export function ChatWindow({ queryState }: ChatWindowProps) {
   if (queryState.status === "idle") {
-    return <p className="status-message">Run a query to view the answer, trace, and scorecard.</p>;
+    return <p className="status-message">Run a query to view the answer and supporting sources.</p>;
   }
   if (queryState.status === "loading") {
-    return <p className="status-message">Running retrieval and multi-agent pipeline...</p>;
+    return <p className="status-message">Running retrieval and answer generation...</p>;
   }
   if (queryState.status === "error") {
     return <p className="status-message">{queryState.message}</p>;

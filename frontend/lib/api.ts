@@ -36,10 +36,39 @@ export type DocumentRow = {
   file_type: string;
   chunk_count: number;
   uploaded_at: string;
+  index_backend?: string;
+  index_status?: "indexed" | "indexing" | "failed" | "legacy_unindexed" | string;
+  indexed_at?: string | null;
+  index_error?: string | null;
   storage_path?: string | null;
   file_size_bytes?: number | null;
   file_sha256?: string | null;
 };
+
+export type UiEventPayload = {
+  event_name: string;
+  page?: string;
+  component?: string;
+  action?: string;
+  payload?: Record<string, unknown>;
+  browser?: Record<string, unknown>;
+  client_timestamp?: string;
+};
+
+function browserMetadata(): Record<string, unknown> {
+  if (typeof window === "undefined") {
+    return {};
+  }
+  return {
+    userAgent: window.navigator.userAgent,
+    language: window.navigator.language,
+    pathname: window.location.pathname,
+    viewport: {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    },
+  };
+}
 
 export async function uploadKnowledgeFile(file: File): Promise<IngestResponse> {
   const formData = new FormData();
@@ -134,4 +163,21 @@ export async function getDashboardMetrics(sessionId: string, days = 7): Promise<
     throw new Error("Could not load dashboard metrics");
   }
   return response.json();
+}
+
+export async function logUiEvent(payload: UiEventPayload): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/observability/ui-events`, {
+    method: "POST",
+    headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({
+      page: typeof window !== "undefined" ? window.location.pathname : "",
+      client_timestamp: new Date().toISOString(),
+      browser: browserMetadata(),
+      ...payload,
+    }),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.detail ?? "Could not log UI event");
+  }
 }

@@ -1,14 +1,16 @@
-from fastapi.testclient import TestClient
+import httpx
+import pytest
 
 from db.supabase import SupabaseRepository
 from main import app
 
 
-client = TestClient(app)
+pytestmark = pytest.mark.anyio
 
 
-def test_create_session_returns_row() -> None:
-    response = client.post("/sessions", json={"title": "Integration Session"})
+async def test_create_session_returns_row() -> None:
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post("/sessions", json={"title": "Integration Session"})
 
     assert response.status_code == 200
     payload = response.json()

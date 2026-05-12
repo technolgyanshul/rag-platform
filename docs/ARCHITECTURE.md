@@ -2,12 +2,12 @@
 
 ## 1. System Overview
 
-This project is a full-stack multi-agent RAG platform with:
+This project is a full-stack RAG platform with:
 
 - Frontend: Next.js (TypeScript) operator UI
 - Backend: FastAPI API service
 - Data layer: Supabase Postgres + pgvector
-- Inference layer: Groq (Researcher/Critic/Synthesizer) + Sarvam (Judge)
+- Inference layer: Groq with Sarvam fallback
 
 Primary user flow:
 
@@ -15,13 +15,13 @@ Primary user flow:
 2. Frontend sends bearer token to backend APIs.
 3. Backend validates token and resolves current user.
 4. Backend enforces team/session ownership at repository boundary.
-5. Retrieval and orchestration run, then results are persisted and returned.
+5. Retrieval and answer generation run, then results are persisted and returned.
 
 ## 2. Runtime Components
 
 ### Frontend (`frontend/`)
 
-- Route pages (`frontend/app/*`) for login/register, knowledge ingest, chat, history, dashboard, team, and profile.
+- Route pages (`frontend/app/*`) for login/register, knowledge ingest, chat, history, dashboard, and profile.
 - Shared API client (`frontend/lib/api.ts`) injects bearer auth headers from Supabase session.
 - Route protection (`frontend/components/auth/ProtectedPage.tsx`) gates non-auth pages.
 
@@ -45,9 +45,8 @@ Primary user flow:
   - Persist document/chunks (`backend/db/supabase.py`)
 - Query:
   - Embed query + vector search (`backend/rag/retriever.py`)
-  - Agent graph (`backend/orchestration/graph.py`):
-    - Researcher -> Critic -> Synthesizer -> Judge
-  - Persist query and agent traces (`backend/db/supabase.py`)
+  - Generate answer from retrieved context (`backend/rag/generator.py`)
+  - Persist query (`backend/db/supabase.py`)
 
 ### Persistence
 
@@ -86,12 +85,12 @@ Auth model:
 
 ### Query Flow
 
-1. Frontend posts `query`, `team_id`, `session_id`, `top_k` to `POST /query`.
+1. Frontend posts `query`, `session_id`, `top_k` to `POST /query`.
 2. Backend validates token, team ownership, and session ownership.
 3. Retrieval executes vector similarity search by `team_id`.
-4. Agent orchestration runs and produces final answer + scorecard + trace.
-5. Query/traces are persisted.
-6. API returns answer, sources, metrics metadata, and trace.
+4. Answer generation runs against the retrieved context.
+5. Query is persisted.
+6. API returns answer, sources, and retrieval metadata.
 
 ### History/Metrics Flow
 
@@ -117,7 +116,7 @@ Known limitations:
 
 - Request IDs are propagated via middleware (`x-request-id`).
 - LLM clients include timeout/retry behavior.
-- Groq fallback response is non-echoing to avoid prompt/source leakage.
+- Query generation has a deterministic extractive local fallback when model API keys are not configured.
 - Query responses include retrieval metadata (`model_version`, embedding/index versions, top-k).
 
 ## 7. Configuration

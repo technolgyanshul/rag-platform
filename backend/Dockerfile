@@ -22,12 +22,9 @@ SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2'); \
 SentenceTransformer('BAAI/bge-base-en-v1.5')"
 
 COPY main.py .
-COPY agents/ ./agents/
 COPY llms/ ./llms/
 COPY core/ ./core/
 COPY db/ ./db/
-COPY orchestration/ ./orchestration/
-COPY prompts/ ./prompts/
 COPY rag/ ./rag/
 COPY routers/ ./routers/
 COPY tests/ ./tests/
@@ -48,12 +45,9 @@ COPY --from=deps /usr/local/bin /usr/local/bin
 
 # only copy application source, not tests/docs
 COPY main.py .
-COPY agents/ ./agents/
 COPY llms/ ./llms/
 COPY core/ ./core/
 COPY db/ ./db/
-COPY orchestration/ ./orchestration/
-COPY prompts/ ./prompts/
 COPY rag/ ./rag/
 COPY routers/ ./routers/
 

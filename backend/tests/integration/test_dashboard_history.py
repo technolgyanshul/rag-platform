@@ -1,13 +1,14 @@
-from fastapi.testclient import TestClient
+import httpx
+import pytest
 
 from db.supabase import SupabaseRepository
 from main import app
 
 
-client = TestClient(app)
+pytestmark = pytest.mark.anyio
 
 
-def test_query_history_returns_saved_rows() -> None:
+async def test_query_history_returns_saved_rows() -> None:
     repository = SupabaseRepository()
     session_id = "33333333-3333-3333-3333-333333333333"
     repository.create_session(user_id="00000000-0000-0000-0000-000000000001", session_id=session_id)
@@ -20,14 +21,15 @@ def test_query_history_returns_saved_rows() -> None:
         response_time_ms=420,
     )
 
-    response = client.get("/query/history", params={"session_id": session_id, "limit": 10})
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/query/history", params={"session_id": session_id, "limit": 10})
     assert response.status_code == 200
     payload = response.json()
     assert len(payload) >= 1
     assert any(item["id"] == row["id"] for item in payload)
 
 
-def test_dashboard_metrics_returns_aggregates() -> None:
+async def test_dashboard_metrics_returns_aggregates() -> None:
     repository = SupabaseRepository()
     session_id = "44444444-4444-4444-4444-444444444444"
     repository.create_session(user_id="00000000-0000-0000-0000-000000000001", session_id=session_id)
@@ -48,7 +50,8 @@ def test_dashboard_metrics_returns_aggregates() -> None:
         response_time_ms=500,
     )
 
-    response = client.get("/dashboard/metrics", params={"session_id": session_id, "days": 7})
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/dashboard/metrics", params={"session_id": session_id, "days": 7})
     assert response.status_code == 200
     payload = response.json()
     assert payload["total_queries"] >= 2

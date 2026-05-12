@@ -1,28 +1,41 @@
-from fastapi.testclient import TestClient
+import httpx
+import pytest
 
 from db.supabase import SupabaseRepository
+import routers.query as query_router
 from main import app
 
 
-client = TestClient(app)
+pytestmark = pytest.mark.anyio
 
 
-def test_query_returns_top_k_sources() -> None:
-    repository = SupabaseRepository()
-    user_id = "00000000-0000-0000-0000-000000000001"
-    document = repository.insert_document(user_id=user_id, filename="report.txt", file_type="txt", chunk_count=2)
-    repository.insert_chunks(
-        document_id=document["id"],
-        chunks=[
-            {"chunk_index": 0, "content": "alpha finding", "embedding": [1.0, 0.0, 0.0], "metadata": {}},
-            {"chunk_index": 1, "content": "beta finding", "embedding": [0.0, 1.0, 0.0], "metadata": {}},
+async def _client() -> httpx.AsyncClient:
+    return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
+
+
+async def test_query_returns_top_k_sources(monkeypatch) -> None:
+    monkeypatch.setattr(
+        query_router,
+        "retrieve_chunks",
+        lambda query, user_id, top_k: [
+            {
+                "document_id": "doc-1",
+                "filename": "report.txt",
+                "chunk_index": 0,
+                "content": "alpha finding",
+                "metadata": {},
+                "similarity": 0.9,
+            }
         ],
     )
+    monkeypatch.setattr(query_router, "generate_answer", lambda query, sources: "Answer from source.")
+    repository = SupabaseRepository()
 
-    response = client.post(
-        "/query",
-        json={"query": "alpha", "session_id": "66666666-6666-6666-6666-666666666666", "top_k": 1},
-    )
+    async with await _client() as client:
+        response = await client.post(
+            "/query",
+            json={"query": "alpha", "session_id": "66666666-6666-6666-6666-666666666666", "top_k": 1},
+        )
 
     assert response.status_code == 200
     payload = response.json()
@@ -31,23 +44,20 @@ def test_query_returns_top_k_sources() -> None:
     assert payload["retrieval_count"] == 1
     assert payload["sources"][0]["filename"] == "report.txt"
     assert "chunk_index" in payload["sources"][0]
-    assert payload["scorecard"] is not None
-    assert {row["agent_name"] for row in payload["agent_trace"]} == {"Researcher", "Critic", "Synthesizer", "Judge"}
-    assert payload["agent_trace"][0]["agent_name"] == "Researcher"
-    assert payload["agent_trace"][1]["agent_name"] == "Critic"
-    assert payload["agent_trace"][2]["agent_name"] == "Synthesizer"
-    assert payload["agent_trace"][3]["agent_name"] == "Judge"
 
 
-def test_query_returns_insufficient_context_when_no_hits() -> None:
-    response = client.post(
-        "/query",
-        json={
-            "query": "unknown",
-            "session_id": "88888888-8888-8888-8888-888888888888",
-            "top_k": 3,
-        },
-    )
+async def test_query_returns_insufficient_context_when_no_hits(monkeypatch) -> None:
+    monkeypatch.setattr(query_router, "retrieve_chunks", lambda query, user_id, top_k: [])
+
+    async with await _client() as client:
+        response = await client.post(
+            "/query",
+            json={
+                "query": "unknown",
+                "session_id": "88888888-8888-8888-8888-888888888888",
+                "top_k": 3,
+            },
+        )
 
     assert response.status_code == 200
     payload = response.json()
@@ -55,4 +65,3 @@ def test_query_returns_insufficient_context_when_no_hits() -> None:
     assert payload["insufficient_context"] is True
     assert payload["retrieval_count"] == 0
     assert payload["sources"] == []
-    assert payload["agent_trace"] == []

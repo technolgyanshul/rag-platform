@@ -8,3 +8,6 @@ sentence-transformers==5.1.1
 requests==2.32.3
 pytesseract==0.3.13
 Pillow==11.2.1
+embed-anything==0.7.0
+qdrant-client==1.17.1
+clickhouse-connect==0.8.18

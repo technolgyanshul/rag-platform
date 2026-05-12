@@ -22,7 +22,7 @@ export function Sidebar({ navItems, activePath, onNavigate, mobile = false }: Si
         </div>
         <div>
           <h1>RAG Ops</h1>
-          <p>Multi-Agent System</p>
+          <p>Retrieval System</p>
         </div>
       </div>
 

@@ -31,8 +31,6 @@ Expected outcome:
 
 - answer appears
 - source citations appear
-- agent trace shows Researcher -> Critic -> Synthesizer -> Judge
-- scorecard appears
 
 ## 4. Verify history
 
@@ -41,7 +39,7 @@ Open `http://localhost:3000/history`.
 Expected outcome:
 
 - recent query appears
-- answer preview and scores appear
+- answer preview appears
 
 ## 5. Verify dashboard
 
@@ -49,10 +47,10 @@ Open `http://localhost:3000/dashboard`.
 
 Expected outcome:
 
-- total queries, average latency, and average score cards are populated
+- total queries and average latency cards are populated
 - 7-day bar chart is populated
 
-## 6. Show tests and evaluation
+## 6. Show tests
 
 ```bash
 cd backend
@@ -61,9 +59,4 @@ pytest
 cd ../frontend
 npm test
 npm run build
-
-cd ..
-python backend/tests/evaluation/run_eval.py
 ```
-
-Open `backend/tests/evaluation/results.md` to show benchmark scaffold output.

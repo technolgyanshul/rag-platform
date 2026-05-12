@@ -17,7 +17,6 @@ class _FallbackStore:
     documents: list[dict[str, Any]] = field(default_factory=list)
     chunks: list[dict[str, Any]] = field(default_factory=list)
     queries: list[dict[str, Any]] = field(default_factory=list)
-    agent_traces: list[dict[str, Any]] = field(default_factory=list)
 
 
 _FALLBACK = _FallbackStore()
@@ -28,7 +27,6 @@ def reset_fallback_store() -> None:
     _FALLBACK.documents.clear()
     _FALLBACK.chunks.clear()
     _FALLBACK.queries.clear()
-    _FALLBACK.agent_traces.clear()
 
 
 class SupabaseRepository:
@@ -148,6 +146,10 @@ class SupabaseRepository:
         embedding_model_version: str | None = None,
         embedding_bge_model_version: str | None = None,
         index_version: str | None = None,
+        index_backend: str = "legacy_supabase_pgvector",
+        index_status: str = "legacy_unindexed",
+        indexed_at: str | None = None,
+        index_error: str | None = None,
         document_id: str | None = None,
     ) -> dict[str, Any]:
         workspace_id = self._ensure_workspace(user_id)
@@ -167,6 +169,10 @@ class SupabaseRepository:
             "embedding_model_version": embedding_model_version,
             "embedding_bge_model_version": embedding_bge_model_version,
             "index_version": index_version,
+            "index_backend": index_backend,
+            "index_status": index_status,
+            "indexed_at": indexed_at,
+            "index_error": index_error,
             "uploaded_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -177,6 +183,48 @@ class SupabaseRepository:
 
         _FALLBACK.documents.append(payload)
         return payload
+
+    def update_document_index_status(
+        self,
+        user_id: str,
+        document_id: str,
+        status: str,
+        backend: str,
+        error: str | None = None,
+        chunk_count: int | None = None,
+    ) -> dict[str, Any]:
+        workspace_id = self._ensure_workspace(user_id)
+        indexed_at = datetime.now(timezone.utc).isoformat() if status == "indexed" else None
+        payload = {
+            "index_backend": backend,
+            "index_status": status,
+            "indexed_at": indexed_at,
+            "index_error": error,
+        }
+        if chunk_count is not None:
+            payload["chunk_count"] = chunk_count
+
+        if self._client:
+            result = (
+                self._client.table("documents")
+                .update(payload)
+                .eq("id", document_id)
+                .eq("team_id", workspace_id)
+                .execute()
+            )
+            if result.data:
+                return result.data[0]
+            raise PermissionError("Document is not accessible for this user")
+
+        for document in _FALLBACK.documents:
+            if document.get("id") != document_id:
+                continue
+            if document.get("team_id") != workspace_id:
+                raise PermissionError("Document is not accessible for this user")
+            document.update(payload)
+            return document
+
+        raise PermissionError("Document is not accessible for this user")
 
     def find_document_by_fingerprint(
         self,
@@ -363,28 +411,17 @@ class SupabaseRepository:
         # In-memory fallback (tests/dev): delegate to cosine-only search
         return self.search_chunks(user_id=user_id, query_embedding=query_embedding, top_k=top_k)
 
-    def get_agents_for_team(self, team_id: str) -> list[dict[str, Any]]:
-        if self._client:
-            result = (
-                self._client.table("agents")
-                .select("role, model_provider, model_name, system_prompt, response_style, position")
-                .eq("team_id", team_id)
-                .order("position", desc=False)
-                .execute()
-            )
-            return result.data or []
-        return []
-
     def save_query(
         self,
         user_id: str,
         session_id: str,
         query_text: str,
         final_answer: str,
-        scorecard: dict[str, Any],
+        scorecard: dict[str, Any] | None,
         response_time_ms: int,
     ) -> dict[str, Any]:
         self._ensure_session_owned(session_id=session_id, user_id=user_id)
+        scorecard = scorecard or {}
 
         payload = {
             "id": str(uuid4()),
@@ -405,27 +442,6 @@ class SupabaseRepository:
 
         _FALLBACK.queries.append(payload)
         return payload
-
-    def save_agent_traces(self, query_id: str, traces: list[dict[str, Any]]) -> None:
-        rows = [
-            {
-                "query_id": query_id,
-                "agent_name": trace.get("agent_name", ""),
-                "model_name": trace.get("model_name", ""),
-                "input_summary": trace.get("input_summary", ""),
-                "output": trace.get("output", ""),
-                "response_time_ms": trace.get("response_time_ms", 0),
-                "metadata": trace.get("metadata", {}),
-            }
-            for trace in traces
-        ]
-
-        if self._client:
-            self._client.table("agent_traces").insert(rows).execute()
-            return
-
-        for row in rows:
-            _FALLBACK.agent_traces.append({"id": str(uuid4()), **row, "created_at": datetime.now(timezone.utc).isoformat()})
 
     def list_queries(self, user_id: str, session_id: str, limit: int = 50) -> list[dict[str, Any]]:
         self._ensure_session_owned(session_id=session_id, user_id=user_id)

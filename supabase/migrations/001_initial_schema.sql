@@ -5,19 +5,6 @@ create table if not exists teams (
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
   domain text,
-  collaboration_mode text default 'sequential',
-  created_at timestamptz default now()
-);
-
-create table if not exists agents (
-  id uuid primary key default gen_random_uuid(),
-  team_id uuid not null references teams(id) on delete cascade,
-  role text not null,
-  model_provider text not null,
-  model_name text not null,
-  system_prompt text,
-  response_style text,
-  position int default 0,
   created_at timestamptz default now()
 );
 
@@ -60,18 +47,6 @@ create table if not exists queries (
   created_at timestamptz default now()
 );
 
-create table if not exists agent_traces (
-  id uuid primary key default gen_random_uuid(),
-  query_id uuid not null references queries(id) on delete cascade,
-  agent_name text not null,
-  model_name text,
-  input_summary text,
-  output text,
-  response_time_ms int,
-  metadata jsonb default '{}',
-  created_at timestamptz default now()
-);
-
 create table if not exists session_logs (
   id uuid primary key default gen_random_uuid(),
   session_id text not null,
@@ -88,24 +63,20 @@ using ivfflat (embedding vector_cosine_ops)
 with (lists = 100);
 
 create index if not exists teams_user_id_idx on teams(user_id);
-create index if not exists agents_team_id_idx on agents(team_id);
 create index if not exists documents_team_id_idx on documents(team_id);
 create index if not exists chunks_document_id_idx on chunks(document_id);
 create index if not exists sessions_user_id_idx on sessions(user_id);
 create index if not exists sessions_team_id_idx on sessions(team_id);
 create index if not exists queries_session_id_idx on queries(session_id);
-create index if not exists agent_traces_query_id_idx on agent_traces(query_id);
 create index if not exists session_logs_session_id_idx on session_logs(session_id);
 create index if not exists session_logs_team_id_idx on session_logs(team_id);
 create index if not exists session_logs_created_at_idx on session_logs(created_at desc);
 
 alter table teams enable row level security;
-alter table agents enable row level security;
 alter table documents enable row level security;
 alter table chunks enable row level security;
 alter table sessions enable row level security;
 alter table queries enable row level security;
-alter table agent_traces enable row level security;
 
 create policy "teams_select_own" on teams
 for select using (auth.uid() = user_id);
@@ -119,23 +90,6 @@ with check (auth.uid() = user_id);
 
 create policy "teams_delete_own" on teams
 for delete using (auth.uid() = user_id);
-
-create policy "agents_all_via_team_owner" on agents
-for all
-using (
-  exists (
-    select 1 from teams
-    where teams.id = agents.team_id
-      and teams.user_id = auth.uid()
-  )
-)
-with check (
-  exists (
-    select 1 from teams
-    where teams.id = agents.team_id
-      and teams.user_id = auth.uid()
-  )
-);
 
 create policy "documents_all_via_team_owner" on documents
 for all
@@ -200,27 +154,6 @@ with check (
   exists (
     select 1 from sessions
     where sessions.id = queries.session_id
-      and sessions.user_id = auth.uid()
-  )
-);
-
-create policy "agent_traces_all_via_query_owner" on agent_traces
-for all
-using (
-  exists (
-    select 1
-    from queries
-    join sessions on sessions.id = queries.session_id
-    where queries.id = agent_traces.query_id
-      and sessions.user_id = auth.uid()
-  )
-)
-with check (
-  exists (
-    select 1
-    from queries
-    join sessions on sessions.id = queries.session_id
-    where queries.id = agent_traces.query_id
       and sessions.user_id = auth.uid()
   )
 );

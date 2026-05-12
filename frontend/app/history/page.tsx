@@ -1,16 +1,20 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import { ProtectedPage } from "../../components/auth/ProtectedPage";
 import { AppShell } from "../../components/layout/AppShell";
-import { listQueryHistory } from "../../lib/api";
+import { listQueryHistory, logUiEvent } from "../../lib/api";
 import { QueryHistoryItem } from "../../lib/types";
 
 export default function HistoryPage() {
   const [sessionId, setSessionId] = useState("");
   const [rows, setRows] = useState<QueryHistoryItem[]>([]);
   const [message, setMessage] = useState("Enter a session ID to load history.");
+
+  useEffect(() => {
+    void logUiEvent({ event_name: "page_view", page: "/history", component: "HistoryPage", action: "load" }).catch(() => undefined);
+  }, []);
 
   const handleLoad = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -20,9 +24,23 @@ export default function HistoryPage() {
     }
     try {
       const result = await listQueryHistory(sessionId.trim());
+      await logUiEvent({
+        event_name: "query_history_success",
+        page: "/history",
+        component: "HistoryPage",
+        action: "load_history",
+        payload: { session_id: sessionId.trim(), row_count: result.length, rows: result },
+      }).catch(() => undefined);
       setRows(result);
       setMessage(result.length ? "" : "No history found for this session.");
     } catch (error) {
+      await logUiEvent({
+        event_name: "query_history_failure",
+        page: "/history",
+        component: "HistoryPage",
+        action: "load_history",
+        payload: { session_id: sessionId.trim(), error: error instanceof Error ? error.message : String(error) },
+      }).catch(() => undefined);
       setRows([]);
       setMessage(error instanceof Error ? error.message : "Could not load history.");
     }

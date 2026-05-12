@@ -27,6 +27,10 @@ def test_insert_document_persists_file_metadata_and_versions() -> None:
         embedding_model_version="text-embedding-3-small@2026-05-08",
         embedding_bge_model_version="bge-m3@2026-05-08",
         index_version="v1",
+        index_backend="ruvector",
+        index_status="indexed",
+        indexed_at="2026-05-12T00:00:00+00:00",
+        index_error=None,
         document_id="10000000-0000-0000-0000-000000000001",
     )
 
@@ -42,6 +46,71 @@ def test_insert_document_persists_file_metadata_and_versions() -> None:
     assert document["embedding_model_version"] == "text-embedding-3-small@2026-05-08"
     assert document["embedding_bge_model_version"] == "bge-m3@2026-05-08"
     assert document["index_version"] == "v1"
+    assert document["index_backend"] == "ruvector"
+    assert document["index_status"] == "indexed"
+    assert document["indexed_at"] == "2026-05-12T00:00:00+00:00"
+    assert document["index_error"] is None
+
+
+def test_insert_document_defaults_legacy_index_metadata() -> None:
+    repository = SupabaseRepository()
+
+    document = repository.insert_document(
+        user_id=USER_ID,
+        filename="legacy.txt",
+        file_type="txt",
+        chunk_count=1,
+    )
+
+    assert document["index_backend"] == "legacy_supabase_pgvector"
+    assert document["index_status"] == "legacy_unindexed"
+    assert document["indexed_at"] is None
+    assert document["index_error"] is None
+
+
+def test_update_document_index_status_persists_metadata() -> None:
+    repository = SupabaseRepository()
+    document = repository.insert_document(
+        user_id=USER_ID,
+        filename="queued.txt",
+        file_type="txt",
+        chunk_count=1,
+    )
+
+    updated = repository.update_document_index_status(
+        user_id=USER_ID,
+        document_id=document["id"],
+        status="failed",
+        backend="ruvector",
+        error="embedding timeout",
+    )
+
+    assert updated["id"] == document["id"]
+    assert updated["index_backend"] == "ruvector"
+    assert updated["index_status"] == "failed"
+    assert updated["index_error"] == "embedding timeout"
+    assert updated["indexed_at"] is None
+
+
+def test_update_document_index_status_sets_indexed_at_for_indexed_status() -> None:
+    repository = SupabaseRepository()
+    document = repository.insert_document(
+        user_id=USER_ID,
+        filename="indexed.txt",
+        file_type="txt",
+        chunk_count=1,
+    )
+
+    updated = repository.update_document_index_status(
+        user_id=USER_ID,
+        document_id=document["id"],
+        status="indexed",
+        backend="ruvector",
+    )
+
+    assert updated["index_status"] == "indexed"
+    assert updated["index_error"] is None
+    assert updated["indexed_at"] is not None
 
 
 def test_find_document_by_fingerprint_returns_matching_document() -> None:

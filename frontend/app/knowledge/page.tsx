@@ -1,22 +1,53 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ProtectedPage } from "../../components/auth/ProtectedPage";
 import { UploadPanel } from "../../components/knowledge/UploadPanel";
 import { AppShell } from "../../components/layout/AppShell";
-import { DocumentRow, getDocumentDownloadUrl, listKnowledgeDocuments } from "../../lib/api";
+import { DocumentRow, getDocumentDownloadUrl, listKnowledgeDocuments, logUiEvent } from "../../lib/api";
+
+function documentStatus(document: DocumentRow): { label: string; className: string; title?: string } {
+  if (document.index_status === "indexed") {
+    return { label: "indexed", className: "badge badge--success" };
+  }
+  if (document.index_status === "indexing") {
+    return { label: "indexing", className: "badge badge--warn" };
+  }
+  if (document.index_status === "failed") {
+    return { label: "failed", className: "badge badge--danger", title: document.index_error ?? undefined };
+  }
+  return { label: "legacy", className: "badge", title: "Not indexed in Qdrant" };
+}
 
 export default function KnowledgePage() {
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [message, setMessage] = useState("Upload a document to populate the demo knowledge base.");
 
+  useEffect(() => {
+    void logUiEvent({ event_name: "page_view", page: "/knowledge", component: "KnowledgePage", action: "load" }).catch(() => undefined);
+  }, []);
+
   const refreshDocuments = async () => {
     try {
       const rows = await listKnowledgeDocuments();
+      await logUiEvent({
+        event_name: "documents_refresh_success",
+        page: "/knowledge",
+        component: "KnowledgePage",
+        action: "refresh_documents",
+        payload: { row_count: rows.length, documents: rows },
+      }).catch(() => undefined);
       setDocuments(rows);
       setMessage(rows.length ? "" : "No documents uploaded yet.");
-    } catch (_error) {
+    } catch (error) {
+      await logUiEvent({
+        event_name: "documents_refresh_failure",
+        page: "/knowledge",
+        component: "KnowledgePage",
+        action: "refresh_documents",
+        payload: { error: error instanceof Error ? error.message : String(error) },
+      }).catch(() => undefined);
       setMessage("Could not load uploaded documents.");
     }
   };
@@ -24,8 +55,22 @@ export default function KnowledgePage() {
   const handleDownload = async (documentId: string) => {
     try {
       const { url } = await getDocumentDownloadUrl(documentId);
+      await logUiEvent({
+        event_name: "document_open_success",
+        page: "/knowledge",
+        component: "KnowledgePage",
+        action: "open_document",
+        payload: { document_id: documentId, url },
+      }).catch(() => undefined);
       window.open(url, "_blank", "noopener,noreferrer");
-    } catch (_error) {
+    } catch (error) {
+      await logUiEvent({
+        event_name: "document_open_failure",
+        page: "/knowledge",
+        component: "KnowledgePage",
+        action: "open_document",
+        payload: { document_id: documentId, error: error instanceof Error ? error.message : String(error) },
+      }).catch(() => undefined);
       setMessage("Could not open the stored source file.");
     }
   };
@@ -62,6 +107,7 @@ export default function KnowledgePage() {
                     <th>Filename</th>
                     <th>Type</th>
                     <th>Chunks</th>
+                    <th>Status</th>
                     <th>Uploaded</th>
                     <th>Source</th>
                   </tr>
@@ -72,6 +118,16 @@ export default function KnowledgePage() {
                       <td>{document.filename}</td>
                       <td>{document.file_type.toUpperCase()}</td>
                       <td>{document.chunk_count}</td>
+                      <td>
+                        {(() => {
+                          const status = documentStatus(document);
+                          return (
+                            <span className={status.className} title={status.title}>
+                              {status.label}
+                            </span>
+                          );
+                        })()}
+                      </td>
                       <td>{new Date(document.uploaded_at).toLocaleString()}</td>
                       <td>
                         <button type="button" onClick={() => void handleDownload(document.id)}>

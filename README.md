@@ -1,23 +1,21 @@
-# Multi-Agent Multi-Model RAG Research Platform
+# RAG Research Platform
 
-Production-style MVP for a traceable multi-agent RAG assistant with citations, agent traces, and scorecards.
+Production-style MVP for a document-grounded RAG assistant with uploads, retrieval, citations, query history, and dashboard metrics.
 
 ## Current Status
 
 Phase 8 baseline is complete:
 - Upload and ingest PDF/image/text
-- Query with retrieval + multi-agent orchestration
+- Query with retrieval + answer generation
 - Query history and dashboard metrics
 - Unit and integration tests
-- Evaluation script scaffold and report output
 
 ## Stack
 
 - Frontend: Next.js + TypeScript
 - Backend: FastAPI
 - DB/Vector: Supabase + pgvector
-- Orchestration: LangGraph
-- LLMs: Groq (agents), Sarvam (judge)
+- LLMs: Groq with Sarvam fallback
 
 ## Setup From Clean Clone
 
@@ -66,9 +64,6 @@ cd frontend
 npm test
 npm run build
 
-# evaluation scaffold
-cd ..
-python backend/tests/evaluation/run_eval.py
 ```
 
 ## API Routes
@@ -85,23 +80,22 @@ python backend/tests/evaluation/run_eval.py
 
 - `docs/ARCHITECTURE.md`
 - `docs/TESTING.md`
-- `docs/EVALUATION.md`
 - `docs/PRD-SOW-HANDOFF.md`
 
 ## Demo Flow
 
-Follow `docs/DEMO.md` for a complete upload -> query -> trace -> dashboard walkthrough.
+Follow `docs/DEMO.md` for a complete upload -> query -> dashboard walkthrough.
 
 ## Completed Deliverables
 
 - [x] Full frontend MVP pages
-- [x] Multi-agent query orchestration and persistence
+- [x] Query generation and persistence
 - [x] Dashboard and query history endpoints
 - [x] Unit/integration/failure-path tests
 - [x] Evaluation scaffold and generated report
 
 ## Next Iteration
 
-1. Replace evaluation stubs with live `/query` benchmarking
-2. Add richer auth and team-scoped authorization tests
+1. Add live `/query` benchmarking
+2. Add richer auth and workspace-scoped authorization tests
 3. Add CI workflow for backend and frontend checks

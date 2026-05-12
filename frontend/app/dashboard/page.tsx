@@ -1,12 +1,12 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import { ProtectedPage } from "../../components/auth/ProtectedPage";
 import { MetricsCards } from "../../components/dashboard/MetricsCards";
 import { QueriesChart } from "../../components/dashboard/QueriesChart";
 import { AppShell } from "../../components/layout/AppShell";
-import { getDashboardMetrics } from "../../lib/api";
+import { getDashboardMetrics, logUiEvent } from "../../lib/api";
 import { DashboardMetrics } from "../../lib/types";
 
 export default function DashboardPage() {
@@ -14,6 +14,10 @@ export default function DashboardPage() {
   const [days, setDays] = useState(7);
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [message, setMessage] = useState("Enter a session ID to view dashboard metrics.");
+
+  useEffect(() => {
+    void logUiEvent({ event_name: "page_view", page: "/dashboard", component: "DashboardPage", action: "load" }).catch(() => undefined);
+  }, []);
 
   const handleLoad = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -23,9 +27,23 @@ export default function DashboardPage() {
     }
     try {
       const payload = await getDashboardMetrics(sessionId.trim(), days);
+      await logUiEvent({
+        event_name: "dashboard_metrics_success",
+        page: "/dashboard",
+        component: "DashboardPage",
+        action: "load_metrics",
+        payload: { session_id: sessionId.trim(), days, metrics: payload },
+      }).catch(() => undefined);
       setMetrics(payload);
       setMessage("");
     } catch (error) {
+      await logUiEvent({
+        event_name: "dashboard_metrics_failure",
+        page: "/dashboard",
+        component: "DashboardPage",
+        action: "load_metrics",
+        payload: { session_id: sessionId.trim(), days, error: error instanceof Error ? error.message : String(error) },
+      }).catch(() => undefined);
       setMetrics(null);
       setMessage(error instanceof Error ? error.message : "Could not load dashboard metrics.");
     }
@@ -35,7 +53,7 @@ export default function DashboardPage() {
     <ProtectedPage>
       <AppShell
         title="Platform Telemetry"
-        subtitle="Track query volume, generation quality, and retrieval latency"
+        subtitle="Track query volume and retrieval latency"
         actions={
           <button type="button" onClick={() => setMetrics(null)} disabled={!metrics}>
             Clear View
@@ -72,7 +90,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="card">
-          <h3 style={{ marginBottom: 12 }}>Scorecards</h3>
+          <h3 style={{ marginBottom: 12 }}>Metrics</h3>
           <MetricsCards metrics={metrics} />
         </div>
 

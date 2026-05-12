@@ -18,7 +18,6 @@ const navItems: NavItem[] = [
   { href: "/knowledge", label: "Knowledge Base", icon: "database" },
   { href: "/chat", label: "Chat Workspace", icon: "forum" },
   { href: "/history", label: "Query Logs", icon: "history" },
-  { href: "/team", label: "Demo Workspace", icon: "group" },
   { href: "/profile", label: "Profile", icon: "account_circle" },
 ];
 

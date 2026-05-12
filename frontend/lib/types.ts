@@ -1,10 +1,3 @@
-export type Scorecard = {
-  overall: number;
-  citation_accuracy: number;
-  insight_depth: number;
-  reasoning: string;
-};
-
 export type Source = {
   document_id: string;
   filename: string;
@@ -13,20 +6,11 @@ export type Source = {
   score: number;
 };
 
-export type AgentTraceRow = {
-  agent_name: string;
-  model_name: string;
-  output: string;
-  response_time_ms: number;
-};
-
 export type QueryResponse = {
   query_id: string | null;
   query: string;
   final_answer: string;
   sources: Source[];
-  scorecard: Scorecard | null;
-  agent_trace: AgentTraceRow[];
   retrieval_count: number;
   insufficient_context: boolean;
   model_version: string;

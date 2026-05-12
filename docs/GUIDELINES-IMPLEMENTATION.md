@@ -6,7 +6,7 @@ This project now applies the core engineering rules from `guidelines.md` with co
 
 - Added typed runtime settings in `backend/core/config.py`.
 - Added stricter boundary validation for `/query`, `/query/history`, `/ingest`, `/ingest/documents`, and `/dashboard/metrics`.
-- Added explicit API failure mapping (`400` for invalid input, `503` for temporary retrieval/orchestration/persistence failures).
+- Added explicit API failure mapping (`400` for invalid input, `503` for temporary retrieval/generation/persistence failures).
 - Added structured logging for request failures and completion paths.
 - Added retrieval observability fields in query responses:
   - `model_version`
@@ -14,7 +14,6 @@ This project now applies the core engineering rules from `guidelines.md` with co
   - `retrieval_metadata.index_version`
   - `retrieval_metadata.top_k`
 - Added request-id middleware in `backend/main.py` to propagate `x-request-id` and tie logs across routes.
-- Added prompt template versioning and separation in `backend/prompts/` with `render_prompt(...)` usage in agent modules.
 - Added timeout/retry resilience wrappers for external LLM calls in:
   - `backend/llms/groq_client.py`
   - `backend/llms/sarvam_client.py`

@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 
-import { uploadKnowledgeFile } from "../../lib/api";
+import { logUiEvent, uploadKnowledgeFile } from "../../lib/api";
 
 type UploadPanelProps = {
   onUploaded: () => void;
@@ -22,12 +22,33 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
 
     setLoading(true);
     setMessage("");
+    await logUiEvent({
+      event_name: "upload_submit",
+      page: "/knowledge",
+      component: "UploadPanel",
+      action: "submit",
+      payload: { name: file.name, size: file.size, type: file.type },
+    }).catch(() => undefined);
     try {
       const response = await uploadKnowledgeFile(file);
-      setMessage(`Uploaded ${response.filename} with ${response.chunks_created} chunks.`);
+      await logUiEvent({
+        event_name: "upload_success",
+        page: "/knowledge",
+        component: "UploadPanel",
+        action: "upload_complete",
+        payload: { file: { name: file.name, size: file.size, type: file.type }, response },
+      }).catch(() => undefined);
+      setMessage(`Uploaded ${response.filename} with ${response.chunks_created} indexed chunks.`);
       setFile(null);
       onUploaded();
     } catch (error) {
+      await logUiEvent({
+        event_name: "upload_failure",
+        page: "/knowledge",
+        component: "UploadPanel",
+        action: "upload_error",
+        payload: { file: { name: file.name, size: file.size, type: file.type }, error: error instanceof Error ? error.message : String(error) },
+      }).catch(() => undefined);
       setMessage(error instanceof Error ? error.message : "Upload failed");
     } finally {
       setLoading(false);
@@ -43,7 +64,19 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
           <input
             type="file"
             accept=".pdf,.png,.jpg,.jpeg,.txt"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            onChange={(event) => {
+              const selected = event.target.files?.[0] ?? null;
+              setFile(selected);
+              if (selected) {
+                void logUiEvent({
+                  event_name: "file_selected",
+                  page: "/knowledge",
+                  component: "UploadPanel",
+                  action: "select_file",
+                  payload: { name: selected.name, size: selected.size, type: selected.type },
+                }).catch(() => undefined);
+              }
+            }}
           />
         </label>
         <button type="submit" disabled={loading}>

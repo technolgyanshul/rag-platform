@@ -1,49 +1,20 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
-from rag.chunking import chunk_text
-from rag.embeddings import embed_chunks, embed_chunks_bge
-from rag.image_text import extract_image_text
-
-
-def parse_document(file_path: str, file_type: str) -> str:
-    normalized_type = file_type.lower()
-    if normalized_type == "pdf":
-        return _parse_pdf(file_path)
-    if normalized_type == "txt":
-        return Path(file_path).read_text(encoding="utf-8", errors="ignore")
-    if normalized_type in {"png", "jpg", "jpeg"}:
-        return extract_image_text(file_path)
-    raise ValueError(f"Unsupported file type: {file_type}")
+from rag.embedanything_pipeline import EmbeddedChunk, embed_file_semantic
 
 
 def ingest_document(file_path: str, file_type: str, chunk_size: int = 1000, chunk_overlap: int = 150) -> dict[str, Any]:
-    extracted_text = parse_document(file_path=file_path, file_type=file_type)
-    chunks = chunk_text(extracted_text, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-    embeddings = embed_chunks(chunks)
-    embeddings_bge = embed_chunks_bge(chunks)
-    chunk_payload = [
-        {
-            "chunk_index": index,
-            "content": chunk,
-            "embedding": embedding,
-            "embedding_bge": embedding_bge,
-            "metadata": {"source_type": file_type.lower()},
-        }
-        for index, (chunk, embedding, embedding_bge) in enumerate(zip(chunks, embeddings, embeddings_bge))
-    ]
-    return {"extracted_text": extracted_text, "chunks": chunk_payload}
+    del chunk_size, chunk_overlap
+    chunks = embed_file_semantic(file_path=file_path, file_type=file_type)
+    return {"chunks": [_chunk_payload(chunk) for chunk in chunks]}
 
 
-def _parse_pdf(file_path: str) -> str:
-    try:
-        from pypdf import PdfReader
-    except ImportError as error:
-        raise RuntimeError("pypdf is required for PDF ingestion") from error
-
-    reader = PdfReader(file_path)
-    pages = [page.extract_text() or "" for page in reader.pages]
-    combined = "\n".join(page.strip() for page in pages if page.strip())
-    return combined
+def _chunk_payload(chunk: EmbeddedChunk) -> dict[str, Any]:
+    return {
+        "chunk_index": chunk.chunk_index,
+        "content": chunk.content,
+        "embedding": chunk.embedding,
+        "metadata": chunk.metadata,
+    }

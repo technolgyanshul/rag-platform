@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getDocumentDownloadUrl, listKnowledgeDocuments, uploadKnowledgeFile } from "./api";
+import { getDocumentDownloadUrl, listKnowledgeDocuments, logUiEvent, uploadKnowledgeFile } from "./api";
 
 vi.mock("@/utils/supabase/client", () => ({
   createClient: vi.fn(() => ({
@@ -87,5 +87,43 @@ describe("getDocumentDownloadUrl", () => {
         Authorization: "Bearer test-token",
       },
     });
+  });
+});
+
+describe("logUiEvent", () => {
+  it("posts browser interaction events with auth headers", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ accepted: true }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await logUiEvent({
+      event_name: "query_submit",
+      page: "/chat",
+      component: "QueryInput",
+      action: "submit",
+      payload: { query: "hello" },
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/observability/ui-events", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-token",
+      },
+      body: expect.stringContaining('"event_name":"query_submit"'),
+    });
+  });
+});
+
+describe("API_BASE_URL", () => {
+  it("uses NEXT_PUBLIC_API_BASE_URL when set for the demo tunnel", async () => {
+    vi.resetModules();
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "/api");
+
+    const api = await import("./api");
+
+    expect(api.API_BASE_URL).toBe("/api");
   });
 });

@@ -7,7 +7,7 @@ const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space
 
 export const metadata: Metadata = {
   title: "RAG Ops",
-  description: "Operator console for multi-agent RAG workflows"
+  description: "Operator console for RAG workflows"
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
