@@ -14,6 +14,7 @@ DEFAULT_EMBEDANYTHING_MODEL = "sentence-transformers/all-MiniLM-L12-v2"
 DEFAULT_SEMANTIC_ENCODER_MODEL = "jinaai/jina-embeddings-v2-small-en"
 DEFAULT_CHUNK_SIZE = 1000
 DEFAULT_BATCH_SIZE = 32
+EMBEDDING_DIMENSION_UNDETERMINED = "Embedding dimension cannot be determined"
 
 SUPPORTED_FILE_TYPES = {"pdf", "txt", "md", "markdown", "png", "jpg", "jpeg", "wav"}
 
@@ -216,15 +217,15 @@ def _normalize_embedding(raw_embedding: Any) -> list[float]:
         embedding = embedding[0].embedding
 
     if embedding is None or isinstance(embedding, (str, bytes)):
-        raise RuntimeError("Embedding dimension cannot be determined")
+        raise RuntimeError(EMBEDDING_DIMENSION_UNDETERMINED)
 
     try:
         vector = [float(value) for value in embedding]
     except (TypeError, ValueError) as exc:
-        raise RuntimeError("Embedding dimension cannot be determined") from exc
+        raise RuntimeError(EMBEDDING_DIMENSION_UNDETERMINED) from exc
 
     if not vector:
-        raise RuntimeError("Embedding dimension cannot be determined")
+        raise RuntimeError(EMBEDDING_DIMENSION_UNDETERMINED)
     return vector
 
 

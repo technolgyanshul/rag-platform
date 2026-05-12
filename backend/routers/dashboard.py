@@ -12,6 +12,7 @@ from db.supabase import SupabaseRepository
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 logger = logging.getLogger(__name__)
+DASHBOARD_METRICS_ROUTE = "/dashboard/metrics"
 
 
 class QueriesOverTimePoint(BaseModel):
@@ -26,7 +27,14 @@ class DashboardMetricsResponse(BaseModel):
     queries_over_time: list[QueriesOverTimePoint]
 
 
-@router.get("/metrics", response_model=DashboardMetricsResponse)
+@router.get(
+    "/metrics",
+    response_model=DashboardMetricsResponse,
+    responses={
+        403: {"description": "Forbidden"},
+        503: {"description": "Dashboard metrics temporarily unavailable"},
+    },
+)
 async def dashboard_metrics(
     request: Request,
     auth_user: AuthUser = Depends(get_current_user),
@@ -42,7 +50,7 @@ async def dashboard_metrics(
             event_name="dashboard_metrics_loaded",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/dashboard/metrics",
+            route=DASHBOARD_METRICS_ROUTE,
             component="dashboard_router",
             metadata={"session_id": str(session_id), "days": days, "metrics": payload},
         )
@@ -51,7 +59,7 @@ async def dashboard_metrics(
             event_name="dashboard_metrics_permission_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/dashboard/metrics",
+            route=DASHBOARD_METRICS_ROUTE,
             component="dashboard_router",
             level="WARNING",
             status="failed",
@@ -65,7 +73,7 @@ async def dashboard_metrics(
             event_name="dashboard_metrics_request_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/dashboard/metrics",
+            route=DASHBOARD_METRICS_ROUTE,
             component="dashboard_router",
             level="ERROR",
             status="failed",

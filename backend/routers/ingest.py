@@ -18,7 +18,9 @@ from rag.qdrant_backend import QdrantVectorBackend
 from rag.vector_backend import VectorPoint
 
 
-router = APIRouter(prefix="/ingest", tags=["ingest"])
+INGEST_ROUTE_PREFIX = "/ingest"
+
+router = APIRouter(prefix=INGEST_ROUTE_PREFIX, tags=["ingest"])
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
@@ -85,7 +87,7 @@ async def ingest(
             event_name="ingest_idempotent_replay",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest",
+            route=INGEST_ROUTE_PREFIX,
             component="ingest_router",
             metadata={"filename": file.filename, "idempotency_key": idempotency_key},
         )
@@ -97,7 +99,7 @@ async def ingest(
             event_name="ingest_validation_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest",
+            route=INGEST_ROUTE_PREFIX,
             component="ingest_router",
             level="WARNING",
             status="failed",
@@ -111,7 +113,7 @@ async def ingest(
             event_name="ingest_repository_ready",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest",
+            route=INGEST_ROUTE_PREFIX,
             component="supabase",
             metadata={"filename": file.filename, "file_type": extension},
         )
@@ -121,7 +123,7 @@ async def ingest(
             event_name="ingest_repository_unavailable",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest",
+            route=INGEST_ROUTE_PREFIX,
             component="supabase",
             level="ERROR",
             status="failed",
@@ -136,7 +138,7 @@ async def ingest(
             event_name="ingest_validation_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest",
+            route=INGEST_ROUTE_PREFIX,
             component="ingest_router",
             level="WARNING",
             status="failed",
@@ -148,7 +150,7 @@ async def ingest(
             event_name="ingest_validation_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest",
+            route=INGEST_ROUTE_PREFIX,
             component="ingest_router",
             level="WARNING",
             status="failed",
@@ -161,7 +163,7 @@ async def ingest(
         event_name="ingest_temp_file_created",
         request_id=request_id,
         user_id=auth_user.user_id,
-        route="/ingest",
+        route=INGEST_ROUTE_PREFIX,
         component="ingest_router",
         metadata={"filename": file.filename, "file_type": extension, "size_bytes": len(payload), "temp_path": temp_path},
     )
@@ -181,7 +183,7 @@ async def ingest(
             event_name="ingest_document_row_created",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest",
+            route=INGEST_ROUTE_PREFIX,
             component="supabase",
             metadata={"document": document_row},
         )
@@ -192,7 +194,7 @@ async def ingest(
             event_name="ingest_pipeline_finished",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest",
+            route=INGEST_ROUTE_PREFIX,
             component="ingest_pipeline",
             duration_ms=int((time.perf_counter() - pipeline_start) * 1000),
             metadata={"filename": file.filename, "chunks": chunks},
@@ -217,7 +219,7 @@ async def ingest(
             event_name="ingest_qdrant_upsert_finished",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest",
+            route=INGEST_ROUTE_PREFIX,
             component="qdrant",
             duration_ms=int((time.perf_counter() - qdrant_start) * 1000),
             metadata={"document_id": document_row["id"], "chunk_count": len(chunks)},
@@ -234,7 +236,7 @@ async def ingest(
             event_name="ingest_document_indexed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest",
+            route=INGEST_ROUTE_PREFIX,
             component="supabase",
             status="indexed",
             metadata={"document_id": document_row["id"], "chunk_count": len(chunks)},
@@ -252,7 +254,7 @@ async def ingest(
             event_name="ingest_indexing_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest",
+            route=INGEST_ROUTE_PREFIX,
             component="ingest_router",
             level="ERROR",
             status="failed",
@@ -265,7 +267,7 @@ async def ingest(
             event_name="ingest_value_error",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest",
+            route=INGEST_ROUTE_PREFIX,
             component="ingest_router",
             level="WARNING",
             status="failed",
@@ -277,7 +279,7 @@ async def ingest(
             event_name="ingest_permission_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest",
+            route=INGEST_ROUTE_PREFIX,
             component="ingest_router",
             level="WARNING",
             status="failed",
@@ -298,7 +300,7 @@ async def ingest(
             event_name="ingest_request_indexing_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest",
+            route=INGEST_ROUTE_PREFIX,
             component="ingest_router",
             level="ERROR",
             status="failed",
@@ -322,7 +324,7 @@ async def ingest(
         event_name="ingest_request_finished",
         request_id=request_id,
         user_id=auth_user.user_id,
-        route="/ingest",
+        route=INGEST_ROUTE_PREFIX,
         component="ingest_router",
         status="success",
         duration_ms=int((time.perf_counter() - ingest_start) * 1000),
@@ -345,7 +347,7 @@ async def list_documents(
             event_name="ingest_documents_loaded",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest/documents",
+            route=f"{INGEST_ROUTE_PREFIX}/documents",
             component="ingest_router",
             metadata={"row_count": len(rows), "documents": rows},
         )
@@ -354,7 +356,7 @@ async def list_documents(
             event_name="ingest_documents_permission_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest/documents",
+            route=f"{INGEST_ROUTE_PREFIX}/documents",
             component="ingest_router",
             level="WARNING",
             status="failed",

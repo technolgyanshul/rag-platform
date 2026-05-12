@@ -27,7 +27,9 @@ class UiEventRequest(BaseModel):
 @router.post(
     "/ui-events",
     status_code=status.HTTP_202_ACCEPTED,
-    responses={503: {"description": "Observability temporarily unavailable"}},
+    responses={
+        503: {"description": "Observability temporarily unavailable"},
+    },
 )
 async def record_ui_event(
     payload: UiEventRequest,

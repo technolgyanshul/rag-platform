@@ -11,6 +11,7 @@ from uuid import uuid4
 logger = logging.getLogger(__name__)
 
 SESSION_ACCESS_ERROR_MESSAGE = "Session is not accessible for this user"
+DOCUMENT_ACCESS_ERROR_MESSAGE = "Document is not accessible for this user"
 
 
 @dataclass
@@ -216,17 +217,17 @@ class SupabaseRepository:
             )
             if result.data:
                 return result.data[0]
-            raise PermissionError("Document is not accessible for this user")
+            raise PermissionError(DOCUMENT_ACCESS_ERROR_MESSAGE)
 
         for document in _FALLBACK.documents:
             if document.get("id") != document_id:
                 continue
             if document.get("team_id") != workspace_id:
-                raise PermissionError("Document is not accessible for this user")
+                raise PermissionError(DOCUMENT_ACCESS_ERROR_MESSAGE)
             document.update(payload)
             return document
 
-        raise PermissionError("Document is not accessible for this user")
+        raise PermissionError(DOCUMENT_ACCESS_ERROR_MESSAGE)
 
     def find_document_by_fingerprint(
         self,
@@ -296,7 +297,7 @@ class SupabaseRepository:
                 .execute()
             )
             if not result.data:
-                raise PermissionError("Document is not accessible for this user")
+                raise PermissionError(DOCUMENT_ACCESS_ERROR_MESSAGE)
 
             storage_path = result.data[0].get("storage_path")
             if not storage_path:
@@ -315,13 +316,13 @@ class SupabaseRepository:
             if document.get("id") != document_id:
                 continue
             if document.get("team_id") != workspace_id:
-                raise PermissionError("Document is not accessible for this user")
+                raise PermissionError(DOCUMENT_ACCESS_ERROR_MESSAGE)
             storage_path = document.get("storage_path")
             if not storage_path:
                 raise ValueError("Document does not have a stored file")
             return f"http://localhost/storage/v1/object/sign/knowledge-files/{storage_path}"
 
-        raise PermissionError("Document is not accessible for this user")
+        raise PermissionError(DOCUMENT_ACCESS_ERROR_MESSAGE)
 
     def insert_chunks(self, document_id: str, chunks: list[dict[str, Any]]) -> None:
         rows = []

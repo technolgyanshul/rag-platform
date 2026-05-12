@@ -15,7 +15,9 @@ from rag.generator import generate_answer
 from rag.retriever import format_sources, retrieve_chunks
 
 
-router = APIRouter(prefix="/query", tags=["query"])
+QUERY_ROUTE_PREFIX = "/query"
+
+router = APIRouter(prefix=QUERY_ROUTE_PREFIX, tags=["query"])
 logger = logging.getLogger(__name__)
 
 
@@ -81,7 +83,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
         event_name="query_request_started",
         request_id=request_id,
         user_id=auth_user.user_id,
-        route="/query",
+        route=QUERY_ROUTE_PREFIX,
         component="query_router",
         metadata={
             "session_id": str(payload.session_id),
@@ -97,7 +99,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             event_name="query_repository_ready",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/query",
+            route=QUERY_ROUTE_PREFIX,
             component="supabase",
             metadata={"session_id": str(payload.session_id)},
         )
@@ -112,7 +114,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
                 event_name="query_session_created",
                 request_id=request_id,
                 user_id=auth_user.user_id,
-                route="/query",
+                route=QUERY_ROUTE_PREFIX,
                 component="supabase",
                 metadata={"session_id": str(payload.session_id)},
             )
@@ -128,7 +130,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             event_name="query_retrieval_finished",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/query",
+            route=QUERY_ROUTE_PREFIX,
             component="retriever",
             duration_ms=int((time.perf_counter() - retrieval_start) * 1000),
             metadata={"query": payload.query, "top_k": selected_top_k, "rows": rows, "sources": sources},
@@ -139,7 +141,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             event_name="query_request_validation_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/query",
+            route=QUERY_ROUTE_PREFIX,
             component="query_router",
             level="WARNING",
             status="failed",
@@ -152,7 +154,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             event_name="query_request_permission_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/query",
+            route=QUERY_ROUTE_PREFIX,
             component="query_router",
             level="WARNING",
             status="failed",
@@ -166,7 +168,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             event_name="query_request_retrieval_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/query",
+            route=QUERY_ROUTE_PREFIX,
             component="query_router",
             level="ERROR",
             status="failed",
@@ -180,7 +182,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             event_name="query_insufficient_context",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/query",
+            route=QUERY_ROUTE_PREFIX,
             component="query_router",
             status="insufficient_context",
             duration_ms=int((time.perf_counter() - query_start) * 1000),
@@ -210,7 +212,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             event_name="query_generation_finished",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/query",
+            route=QUERY_ROUTE_PREFIX,
             component="generator",
             duration_ms=int((time.perf_counter() - generation_start) * 1000),
             metadata={"query": payload.query, "sources": sources, "final_answer": final_answer},
@@ -221,7 +223,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             event_name="query_request_generation_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/query",
+            route=QUERY_ROUTE_PREFIX,
             component="generator",
             level="ERROR",
             status="failed",
@@ -244,7 +246,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             event_name="query_persistence_finished",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/query",
+            route=QUERY_ROUTE_PREFIX,
             component="supabase",
             status="saved",
             metadata={"query_id": query_row["id"], "session_id": str(payload.session_id), "response_time_ms": total_response_ms},
@@ -254,7 +256,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             event_name="query_persistence_permission_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/query",
+            route=QUERY_ROUTE_PREFIX,
             component="supabase",
             level="WARNING",
             status="failed",
@@ -267,7 +269,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             event_name="query_request_persistence_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/query",
+            route=QUERY_ROUTE_PREFIX,
             component="supabase",
             level="ERROR",
             status="failed",
@@ -280,7 +282,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
         event_name="query_request_finished",
         request_id=request_id,
         user_id=auth_user.user_id,
-        route="/query",
+        route=QUERY_ROUTE_PREFIX,
         component="query_router",
         status="success",
         duration_ms=total_response_ms,
@@ -319,7 +321,7 @@ async def query_history(
             event_name="query_history_loaded",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/query/history",
+            route=f"{QUERY_ROUTE_PREFIX}/history",
             component="query_router",
             metadata={"session_id": str(session_id), "limit": limit, "row_count": len(rows)},
         )
@@ -328,7 +330,7 @@ async def query_history(
             event_name="query_history_permission_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/query/history",
+            route=f"{QUERY_ROUTE_PREFIX}/history",
             component="query_router",
             level="WARNING",
             status="failed",
