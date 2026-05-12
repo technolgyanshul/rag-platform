@@ -1,4 +1,10 @@
-import { DashboardMetrics, QueryHistoryItem, QueryResponse, SessionRecord } from "./types";
+import {
+  DashboardMetrics,
+  DocumentDownloadResponse,
+  QueryHistoryItem,
+  QueryResponse,
+  SessionRecord,
+} from "./types";
 import { createClient } from "@/utils/supabase/client";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
@@ -30,6 +36,9 @@ export type DocumentRow = {
   file_type: string;
   chunk_count: number;
   uploaded_at: string;
+  storage_path?: string | null;
+  file_size_bytes?: number | null;
+  file_sha256?: string | null;
 };
 
 export async function uploadKnowledgeFile(file: File): Promise<IngestResponse> {
@@ -57,6 +66,16 @@ export async function listKnowledgeDocuments(): Promise<DocumentRow[]> {
   });
   if (!response.ok) {
     throw new Error("Could not load documents");
+  }
+  return response.json();
+}
+
+export async function getDocumentDownloadUrl(documentId: string): Promise<DocumentDownloadResponse> {
+  const response = await fetch(`${API_BASE_URL}/ingest/documents/${encodeURIComponent(documentId)}/download`, {
+    headers: await buildAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("Could not create document download URL");
   }
   return response.json();
 }

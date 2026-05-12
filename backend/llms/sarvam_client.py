@@ -8,7 +8,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SARVAM_CHAT_MODEL = "sarvam-m"
+DEFAULT_SARVAM_CHAT_MODEL = os.getenv("SARVAM_CHAT_MODEL", "sarvam-m")
 
 
 class SarvamClient:
@@ -33,7 +33,7 @@ class SarvamClient:
                 response = requests.post(
                     "https://api.sarvam.ai/v1/chat/completions",
                     headers={"api-subscription-key": self.api_key, "Content-Type": "application/json"},
-                    json={"model": DEFAULT_SARVAM_CHAT_MODEL, "messages": messages, "temperature": 0.2},
+                    json={"model": chat_model, "messages": messages, "temperature": 0.2},
                     timeout=self.timeout_seconds,
                 )
                 if response.ok:

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import os
+
 from core.config import get_settings
 from llms.groq_client import GroqClient
 from prompts.loader import render_prompt
 
 
-DEFAULT_SYNTHESIZER_MODEL = "llama-3.1-70b-versatile"
+DEFAULT_SYNTHESIZER_MODEL = os.getenv("SYNTHESIZER_MODEL", "llama-3.1-70b-versatile")
 
 
 def run_synthesizer(

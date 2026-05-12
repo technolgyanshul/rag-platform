@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import os
+
 from core.config import get_settings
 from llms.groq_client import GroqClient
 from prompts.loader import render_prompt
 
 
-DEFAULT_CRITIC_MODEL = "llama-3.1-8b-instant"
+DEFAULT_CRITIC_MODEL = os.getenv("CRITIC_MODEL", "llama-3.1-8b-instant")
 
 
 def run_critic(

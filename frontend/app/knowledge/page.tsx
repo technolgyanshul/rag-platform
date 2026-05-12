@@ -5,7 +5,7 @@ import { useState } from "react";
 import { ProtectedPage } from "../../components/auth/ProtectedPage";
 import { UploadPanel } from "../../components/knowledge/UploadPanel";
 import { AppShell } from "../../components/layout/AppShell";
-import { DocumentRow, listKnowledgeDocuments } from "../../lib/api";
+import { DocumentRow, getDocumentDownloadUrl, listKnowledgeDocuments } from "../../lib/api";
 
 export default function KnowledgePage() {
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
@@ -18,6 +18,15 @@ export default function KnowledgePage() {
       setMessage(rows.length ? "" : "No documents uploaded yet.");
     } catch (_error) {
       setMessage("Could not load uploaded documents.");
+    }
+  };
+
+  const handleDownload = async (documentId: string) => {
+    try {
+      const { url } = await getDocumentDownloadUrl(documentId);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (_error) {
+      setMessage("Could not open the stored source file.");
     }
   };
 
@@ -54,6 +63,7 @@ export default function KnowledgePage() {
                     <th>Type</th>
                     <th>Chunks</th>
                     <th>Uploaded</th>
+                    <th>Source</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -63,6 +73,11 @@ export default function KnowledgePage() {
                       <td>{document.file_type.toUpperCase()}</td>
                       <td>{document.chunk_count}</td>
                       <td>{new Date(document.uploaded_at).toLocaleString()}</td>
+                      <td>
+                        <button type="button" onClick={() => void handleDownload(document.id)}>
+                          Open file
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
