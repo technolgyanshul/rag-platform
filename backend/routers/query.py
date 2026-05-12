@@ -62,7 +62,7 @@ class QueryHistoryItem(BaseModel):
     created_at: str
 
 
-@router.post("", response_model=QueryResponse)
+@router.post("", response_model=QueryResponse, responses={400: {"description": "Invalid query payload"}})
 async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser = Depends(get_current_user)) -> QueryResponse:
     settings = get_settings()
     request_id = getattr(request.state, "request_id", "unknown")

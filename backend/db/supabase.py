@@ -10,6 +10,8 @@ from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
+SESSION_ACCESS_ERROR_MESSAGE = "Session is not accessible for this user"
+
 
 @dataclass
 class _FallbackStore:
@@ -82,7 +84,7 @@ class SupabaseRepository:
     def _ensure_session_owned(self, session_id: str, user_id: str) -> None:
         session = self.get_session(user_id=user_id, session_id=session_id)
         if session is None:
-            raise PermissionError("Session is not accessible for this user")
+            raise PermissionError(SESSION_ACCESS_ERROR_MESSAGE)
 
     def get_session(self, user_id: str, session_id: str) -> dict[str, Any] | None:
         if self._client:
@@ -91,14 +93,14 @@ class SupabaseRepository:
                 return None
             row = result.data[0]
             if str(row.get("user_id", "")) != user_id:
-                raise PermissionError("Session is not accessible for this user")
+                raise PermissionError(SESSION_ACCESS_ERROR_MESSAGE)
             return row
 
         row = self._find_fallback_session(session_id)
         if row is None:
             return None
         if str(row.get("user_id", "")) != user_id:
-            raise PermissionError("Session is not accessible for this user")
+            raise PermissionError(SESSION_ACCESS_ERROR_MESSAGE)
         return row
 
     def create_session(
@@ -125,7 +127,7 @@ class SupabaseRepository:
         existing = self._find_fallback_session(payload["id"])
         if existing:
             if str(existing.get("user_id", "")) != user_id:
-                raise PermissionError("Session is not accessible for this user")
+                raise PermissionError(SESSION_ACCESS_ERROR_MESSAGE)
             return existing
 
         _FALLBACK.sessions.append(payload)

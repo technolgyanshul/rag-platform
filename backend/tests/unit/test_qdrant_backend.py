@@ -63,7 +63,9 @@ def test_upsert_payload_includes_isolation_fields_and_deterministic_ids() -> Non
 
     backend.upsert_points([first, second])
 
-    points = client.upsert_calls[0]["points"]
+    upsert_call = next(iter(client.upsert_calls), None)
+    assert upsert_call is not None
+    points = upsert_call["points"]
     assert points[0].id == points[1].id
     assert points[0].payload == {
         "user_id": "user-a",
