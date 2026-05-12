@@ -69,8 +69,9 @@ def test_upsert_payload_includes_isolation_fields_and_deterministic_ids() -> Non
     assert upsert_call is not None
     points = upsert_call["points"]
     assert len(points) == 2
-    assert points[0].id == points[1].id
-    assert points[0].payload == {
+    first_point, second_point = points
+    assert first_point.id == second_point.id
+    assert first_point.payload == {
         "user_id": "user-a",
         "document_id": "doc-1",
         "filename": "a.txt",
@@ -118,7 +119,8 @@ def test_search_applies_user_id_filter_and_sorts_by_score() -> None:
     assert search_call is not None
     filter_conditions = search_call["query_filter"].must
     assert len(filter_conditions) == 1
-    user_filter = filter_conditions[0]
+    user_filter = next(iter(filter_conditions), None)
+    assert user_filter is not None
     assert user_filter.key == "user_id"
     assert user_filter.match.value == "user-a"
     assert len(rows) == 2
