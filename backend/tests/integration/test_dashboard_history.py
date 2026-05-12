@@ -21,7 +21,7 @@ async def test_query_history_returns_saved_rows() -> None:
         response_time_ms=420,
     )
 
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test") as client:
         response = await client.get("/query/history", params={"session_id": session_id, "limit": 10})
     assert response.status_code == 200
     payload = response.json()
@@ -50,7 +50,7 @@ async def test_dashboard_metrics_returns_aggregates() -> None:
         response_time_ms=500,
     )
 
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test") as client:
         response = await client.get("/dashboard/metrics", params={"session_id": session_id, "days": 7})
     assert response.status_code == 200
     payload = response.json()

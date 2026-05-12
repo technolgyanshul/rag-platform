@@ -40,9 +40,12 @@ FROM python:3.11-slim AS final
 WORKDIR /app
 
 RUN groupadd --system app && \
-    useradd --system --gid app --home-dir /home/app --create-home app
+    useradd --system --gid app --home-dir /home/app --create-home app && \
+    mkdir -p /home/app/.cache && \
+    chown -R app:app /app /home/app
 
-ENV HOME=/home/app
+ENV HOME=/home/app \
+    XDG_CACHE_HOME=/home/app/.cache
 
 # copy installed packages from deps stage (avoids re-downloading)
 COPY --from=deps /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages

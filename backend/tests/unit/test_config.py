@@ -23,7 +23,7 @@ def test_settings_include_qdrant_embedanything_defaults(monkeypatch: pytest.Monk
 
     settings = get_settings()
 
-    assert settings.qdrant_url == "http://qdrant:6333"
+    assert settings.qdrant_url == "https://qdrant:6333"
     assert settings.qdrant_collection == "rag_documents"
     assert settings.embedanything_model == "sentence-transformers/all-MiniLM-L6-v2"
     assert settings.embedanything_chunk_strategy == "semantic"

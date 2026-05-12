@@ -25,7 +25,7 @@ def test_clickhouse_settings_defaults_disabled(monkeypatch: pytest.MonkeyPatch) 
     settings = get_settings()
 
     assert settings.clickhouse_enabled is False
-    assert settings.clickhouse_host == "http://clickhouse:8123"
+    assert settings.clickhouse_host == "https://clickhouse:8123"
     assert settings.clickhouse_database == "rag_logs"
     assert settings.clickhouse_username == "default"
     assert settings.clickhouse_password == ""
