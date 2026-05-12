@@ -21,7 +21,16 @@ from sentence_transformers import SentenceTransformer; \
 SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2'); \
 SentenceTransformer('BAAI/bge-base-en-v1.5')"
 
-COPY . .
+COPY main.py .
+COPY agents/ ./agents/
+COPY llms/ ./llms/
+COPY core/ ./core/
+COPY db/ ./db/
+COPY orchestration/ ./orchestration/
+COPY prompts/ ./prompts/
+COPY rag/ ./rag/
+COPY routers/ ./routers/
+COPY tests/ ./tests/
 
 ENV TRANSFORMERS_OFFLINE=1 \
     HF_DATASETS_OFFLINE=1
