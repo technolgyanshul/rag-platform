@@ -64,7 +64,20 @@ class QueryHistoryItem(BaseModel):
     created_at: str
 
 
-@router.post("", response_model=QueryResponse, responses={400: {"description": "Invalid query payload"}})
+@router.post(
+    "",
+    response_model=QueryResponse,
+    responses={
+        400: {"description": "Invalid query payload"},
+        403: {"description": "Forbidden"},
+        503: {
+            "description": (
+                "Query processing temporarily unavailable during retrieval, "
+                "persistence, or answer generation."
+            )
+        },
+    },
+)
 async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser = Depends(get_current_user)) -> QueryResponse:
     settings = get_settings()
     request_id = getattr(request.state, "request_id", "unknown")
@@ -305,7 +318,14 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
     )
 
 
-@router.get("/history", response_model=list[QueryHistoryItem])
+@router.get(
+    "/history",
+    response_model=list[QueryHistoryItem],
+    responses={
+        403: {"description": "Forbidden"},
+        503: {"description": "Query history temporarily unavailable"},
+    },
+)
 async def query_history(
     request: Request,
     auth_user: AuthUser = Depends(get_current_user),
@@ -343,7 +363,7 @@ async def query_history(
             event_name="query_history_request_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/query/history",
+            route=f"{QUERY_ROUTE_PREFIX}/history",
             component="query_router",
             level="ERROR",
             status="failed",
