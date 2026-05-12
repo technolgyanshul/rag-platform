@@ -8,39 +8,17 @@ services:
       - .env
     environment:
       - CLICKHOUSE_ENABLED=${CLICKHOUSE_ENABLED:-true}
-      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST:-http://clickhouse:8123}
+      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST:?Set CLICKHOUSE_HOST to your ClickHouse Cloud HTTPS URL}
       - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE:-rag_logs}
       - CLICKHOUSE_USERNAME=${CLICKHOUSE_USERNAME:-default}
       - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
       - CLICKHOUSE_STRICT=${CLICKHOUSE_STRICT:-true}
-      - CLICKHOUSE_LOG_RAW_PAYLOADS=${CLICKHOUSE_LOG_RAW_PAYLOADS:-true}
+      - CLICKHOUSE_LOG_RAW_PAYLOADS=${CLICKHOUSE_LOG_RAW_PAYLOADS:-false}
     volumes:
       - ./backend:/app
     depends_on:
       qdrant:
         condition: service_healthy
-      clickhouse:
-        condition: service_healthy
-    restart: unless-stopped
-
-  clickhouse:
-    image: clickhouse/clickhouse-server:24.12
-    ports:
-      - "8123:8123"
-      - "9000:9000"
-    environment:
-      - CLICKHOUSE_DB=rag_logs
-      - CLICKHOUSE_USER=default
-      - CLICKHOUSE_PASSWORD=
-      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
-    volumes:
-      - clickhouse_data:/var/lib/clickhouse
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping | grep -q Ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
     restart: unless-stopped
 
   qdrant:
@@ -59,23 +37,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    restart: unless-stopped
-
-  grafana:
-    image: grafana/grafana:11.4.0
-    ports:
-      - "3001:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
-      - GF_INSTALL_PLUGINS=grafana-clickhouse-datasource
-      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/rag-observability.json
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-    depends_on:
-      clickhouse:
-        condition: service_healthy
     restart: unless-stopped
 
   frontend:
@@ -120,6 +81,4 @@ services:
       - test
 
 volumes:
-  clickhouse_data:
-  grafana_data:
   qdrant_data:

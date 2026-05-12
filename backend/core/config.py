@@ -84,10 +84,10 @@ def get_settings() -> Settings:
         index_version=os.getenv("INDEX_VERSION", "embedanything-qdrant-semantic-v1"),
         model_version=os.getenv("MODEL_VERSION", "groq-sarvam-v1"),
         clickhouse_enabled=_parse_bool("CLICKHOUSE_ENABLED", default=False),
-        clickhouse_host=os.getenv("CLICKHOUSE_HOST", "https://clickhouse:8123"),
+        clickhouse_host=os.getenv("CLICKHOUSE_HOST", ""),
         clickhouse_database=os.getenv("CLICKHOUSE_DATABASE", "rag_logs"),
         clickhouse_username=os.getenv("CLICKHOUSE_USERNAME", "default"),
         clickhouse_password=os.getenv("CLICKHOUSE_PASSWORD", ""),
         clickhouse_strict=_parse_bool("CLICKHOUSE_STRICT", default=True),
-        clickhouse_log_raw_payloads=_parse_bool("CLICKHOUSE_LOG_RAW_PAYLOADS", default=True),
+        clickhouse_log_raw_payloads=_parse_bool("CLICKHOUSE_LOG_RAW_PAYLOADS", default=False),
     )

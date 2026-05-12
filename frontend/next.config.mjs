@@ -2,6 +2,7 @@
 const apiInternalBaseUrl = process.env.API_INTERNAL_BASE_URL || "http://backend:8000";
 
 const nextConfig = {
+  allowedDevOrigins: ["rag.anshul-garg.com"],
   async rewrites() {
     return [
       {

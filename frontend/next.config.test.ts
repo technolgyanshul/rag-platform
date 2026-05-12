@@ -13,4 +13,8 @@ describe("nextConfig", () => {
       },
     ]);
   });
+
+  it("allows the Cloudflare tunnel host to access Next.js dev resources", () => {
+    expect(nextConfig.allowedDevOrigins).toContain("rag.anshul-garg.com");
+  });
 });

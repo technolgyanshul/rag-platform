@@ -278,6 +278,9 @@ class ClickHouseObservability:
         except ImportError as exc:
             raise RuntimeError("clickhouse-connect is required for ClickHouse observability") from exc
 
+        if not settings.clickhouse_host:
+            raise RuntimeError("CLICKHOUSE_HOST is required when ClickHouse observability is enabled")
+
         parsed = urlparse(settings.clickhouse_host)
         secure = parsed.scheme == "https"
         self._client = clickhouse_connect.get_client(

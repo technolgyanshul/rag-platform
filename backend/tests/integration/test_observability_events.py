@@ -20,7 +20,7 @@ async def test_ui_event_endpoint_writes_authenticated_event(monkeypatch) -> None
 
     monkeypatch.setattr(observability, "get_observability", lambda: FakeObservability())
 
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test") as client:
         response = await client.post(
             "/observability/ui-events",
             json={
@@ -50,7 +50,7 @@ async def test_ui_event_endpoint_surfaces_strict_clickhouse_failure(monkeypatch)
 
     monkeypatch.setattr(observability, "get_observability", lambda: FakeObservability())
 
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test") as client:
         response = await client.post(
             "/observability/ui-events",
             json={"event_name": "query_submit", "page": "/chat"},
