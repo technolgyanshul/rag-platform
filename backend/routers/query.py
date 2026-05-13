@@ -208,6 +208,56 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
         raise HTTPException(status_code=503, detail="Retrieval temporarily unavailable") from error
 
     if not sources:
+        final_answer = (
+            "Insufficient context to answer from uploaded documents. "
+            "Please upload more relevant files or rephrase the query."
+        )
+        total_response_ms = int((time.perf_counter() - query_start) * 1000)
+        try:
+            query_row = repository.save_query(
+                session_id=str(payload.session_id),
+                query_text=payload.query,
+                final_answer=final_answer,
+                scorecard=None,
+                response_time_ms=total_response_ms,
+                user_id=auth_user.user_id,
+            )
+            observer.record_trace_event(
+                event_name="query_persistence_finished",
+                request_id=request_id,
+                user_id=auth_user.user_id,
+                route=QUERY_ROUTE_PREFIX,
+                component="supabase",
+                status="saved",
+                metadata={"query_id": query_row["id"], "session_id": str(payload.session_id), "response_time_ms": total_response_ms},
+            )
+        except PermissionError as error:
+            observer.record_trace_event(
+                event_name="query_persistence_permission_failed",
+                request_id=request_id,
+                user_id=auth_user.user_id,
+                route=QUERY_ROUTE_PREFIX,
+                component="supabase",
+                level="WARNING",
+                status="failed",
+                error=error,
+            )
+            raise HTTPException(status_code=403, detail=str(error)) from error
+        except Exception as error:
+            logger.exception("query_request_persistence_failed", extra={"request_id": request_id, "session_id": str(payload.session_id)})
+            observer.record_trace_event(
+                event_name="query_request_persistence_failed",
+                request_id=request_id,
+                user_id=auth_user.user_id,
+                route=QUERY_ROUTE_PREFIX,
+                component="supabase",
+                level="ERROR",
+                status="failed",
+                metadata={"session_id": str(payload.session_id)},
+                error=error,
+            )
+            raise HTTPException(status_code=503, detail="Query persistence temporarily unavailable") from error
+
         observer.record_trace_event(
             event_name="query_insufficient_context",
             request_id=request_id,
@@ -215,15 +265,13 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             route=QUERY_ROUTE_PREFIX,
             component="query_router",
             status="insufficient_context",
-            duration_ms=int((time.perf_counter() - query_start) * 1000),
+            duration_ms=total_response_ms,
             metadata={"query": payload.query, "top_k": selected_top_k},
         )
         return QueryResponse(
+            query_id=query_row["id"],
             query=payload.query,
-            final_answer=(
-                "Insufficient context to answer from uploaded documents. "
-                "Please upload more relevant files or rephrase the query."
-            ),
+            final_answer=final_answer,
             sources=[],
             retrieval_count=0,
             insufficient_context=True,

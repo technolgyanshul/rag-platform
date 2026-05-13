@@ -62,6 +62,17 @@ class SupabaseRepository:
     def _ensure_workspace(self, user_id: str) -> str:
         workspace_id = self._workspace_id_for_user(user_id)
         if self._client:
+            # Prefer any existing team for this user so previously uploaded documents remain visible.
+            existing_for_user = (
+                self._client.table("teams")
+                .select("id")
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+            if existing_for_user.data:
+                return str(existing_for_user.data[0].get("id", workspace_id))
+
             result = self._client.table("teams").select("id").eq("id", workspace_id).eq("user_id", user_id).limit(1).execute()
             if result.data:
                 return workspace_id

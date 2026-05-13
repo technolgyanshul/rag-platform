@@ -28,6 +28,7 @@ export default function KnowledgePage() {
     void logUiEvent({ event_name: "page_view", page: "/knowledge", component: "KnowledgePage", action: "load" }).catch((error: unknown) => {
       console.error("Failed to log knowledge page view event", error);
     });
+    void refreshDocuments();
   }, []);
 
   const refreshDocuments = async () => {

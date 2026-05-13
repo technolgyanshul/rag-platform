@@ -59,7 +59,7 @@ async def test_query_returns_insufficient_context_when_no_hits(monkeypatch) -> N
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["query_id"] is None
+    assert payload["query_id"]
     assert payload["insufficient_context"] is True
     assert payload["retrieval_count"] == 0
     assert payload["sources"] == []
