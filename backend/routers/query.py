@@ -87,6 +87,7 @@ def _split_reasoning_and_answer(raw_text: str) -> tuple[str | None, str]:
     responses={
         400: {"description": "Invalid query payload"},
         403: {"description": "Forbidden"},
+        409: {"description": "Team has no agents configured"},
         503: {
             "description": (
                 "Query processing temporarily unavailable during retrieval, "
@@ -135,7 +136,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
         )
         session = repository.get_session(user_id=auth_user.user_id, session_id=str(payload.session_id))
         if session is None:
-            repository.create_session(
+            session = repository.create_session(
                 user_id=auth_user.user_id,
                 session_id=str(payload.session_id),
                 title="Chat session",
@@ -148,6 +149,11 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
                 component="supabase",
                 metadata={"session_id": str(payload.session_id)},
             )
+        session_team_id = str(session.get("team_id", "")).strip()
+        if not session_team_id:
+            raise HTTPException(status_code=503, detail="Session team is missing")
+        if not repository.team_has_agents(user_id=auth_user.user_id, team_id=session_team_id):
+            raise HTTPException(status_code=409, detail="Team must have at least one agent before chat")
 
         retrieval_start = time.perf_counter()
         rows = retrieve_chunks(
@@ -192,6 +198,8 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             error=error,
         )
         raise HTTPException(status_code=403, detail=str(error)) from error
+    except HTTPException:
+        raise
     except Exception as error:
         logger.exception("query_request_retrieval_failed", extra={"request_id": request_id, "user_id": auth_user.user_id})
         observer.record_trace_event(

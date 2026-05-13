@@ -12,6 +12,38 @@ logger = logging.getLogger(__name__)
 
 SESSION_ACCESS_ERROR_MESSAGE = "Session is not accessible for this user"
 DOCUMENT_ACCESS_ERROR_MESSAGE = "Document is not accessible for this user"
+TEAM_ACCESS_ERROR_MESSAGE = "Team is not accessible for this user"
+AGENT_ACCESS_ERROR_MESSAGE = "Agent is not accessible for this team"
+
+DEFAULT_TEAM_AGENTS: tuple[dict[str, Any], ...] = (
+    {
+        "name": "Researcher",
+        "role": "researcher",
+        "system_prompt": "Find the strongest evidence in the retrieved sources.",
+        "model_provider": "ollama",
+        "model_name": "llama3.1:8b",
+        "response_style": "evidence-first",
+        "execution_order": 0,
+    },
+    {
+        "name": "Critic",
+        "role": "critic",
+        "system_prompt": "Challenge weak claims and identify unsupported statements.",
+        "model_provider": "ollama",
+        "model_name": "llama3.1:8b",
+        "response_style": "skeptical",
+        "execution_order": 1,
+    },
+    {
+        "name": "Synthesizer",
+        "role": "synthesizer",
+        "system_prompt": "Synthesize evidence and produce a concise final answer.",
+        "model_provider": "ollama",
+        "model_name": "llama3.1:8b",
+        "response_style": "balanced",
+        "execution_order": 2,
+    },
+)
 
 
 class DocumentStorageError(RuntimeError):
@@ -20,6 +52,8 @@ class DocumentStorageError(RuntimeError):
 
 @dataclass
 class _FallbackStore:
+    teams: list[dict[str, Any]] = field(default_factory=list)
+    agents: list[dict[str, Any]] = field(default_factory=list)
     sessions: list[dict[str, Any]] = field(default_factory=list)
     documents: list[dict[str, Any]] = field(default_factory=list)
     chunks: list[dict[str, Any]] = field(default_factory=list)
@@ -30,6 +64,8 @@ _FALLBACK = _FallbackStore()
 
 
 def reset_fallback_store() -> None:
+    _FALLBACK.teams.clear()
+    _FALLBACK.agents.clear()
     _FALLBACK.sessions.clear()
     _FALLBACK.documents.clear()
     _FALLBACK.chunks.clear()
@@ -86,10 +122,52 @@ class SupabaseRepository:
             }
             result = self._client.table("teams").insert(payload).execute()
             if result.data:
-                return str(result.data[0].get("id", workspace_id))
+                created_workspace_id = str(result.data[0].get("id", workspace_id))
+                self._seed_default_agents(user_id=user_id, team_id=created_workspace_id)
+                return created_workspace_id
             raise RuntimeError("Failed to create demo workspace")
 
+        for team in _FALLBACK.teams:
+            if str(team.get("user_id", "")) == user_id:
+                return str(team.get("id", workspace_id))
+
+        self.create_team(
+            user_id=user_id,
+            name="Demo Workspace",
+            domain=None,
+            team_id=workspace_id,
+            seed_default_agents=True,
+        )
         return workspace_id
+
+    def _find_fallback_team(self, team_id: str) -> dict[str, Any] | None:
+        for row in _FALLBACK.teams:
+            if row.get("id") == team_id:
+                return row
+        return None
+
+    def _ensure_team_owned(self, user_id: str, team_id: str) -> dict[str, Any]:
+        team = self.get_team(user_id=user_id, team_id=team_id)
+        if team is None:
+            raise PermissionError(TEAM_ACCESS_ERROR_MESSAGE)
+        return team
+
+    def _seed_default_agents(self, user_id: str, team_id: str) -> None:
+        if self.team_has_agents(user_id=user_id, team_id=team_id):
+            return
+
+        for template in DEFAULT_TEAM_AGENTS:
+            self.create_agent(
+                user_id=user_id,
+                team_id=team_id,
+                name=str(template["name"]),
+                role=str(template["role"]),
+                system_prompt=str(template["system_prompt"]),
+                model_provider=str(template["model_provider"]),
+                model_name=str(template["model_name"]),
+                response_style=str(template["response_style"]),
+                execution_order=int(template["execution_order"]),
+            )
 
     def _find_fallback_session(self, session_id: str) -> dict[str, Any] | None:
         for row in _FALLBACK.sessions:
@@ -124,8 +202,10 @@ class SupabaseRepository:
         user_id: str,
         title: str | None = None,
         session_id: str | None = None,
+        team_id: str | None = None,
     ) -> dict[str, Any]:
-        workspace_id = self._ensure_workspace(user_id)
+        workspace_id = team_id or self._ensure_workspace(user_id)
+        self._ensure_team_owned(user_id=user_id, team_id=workspace_id)
         payload = {
             "id": session_id or str(uuid4()),
             "user_id": user_id,
@@ -148,6 +228,248 @@ class SupabaseRepository:
 
         _FALLBACK.sessions.append(payload)
         return payload
+
+    def list_teams(self, user_id: str) -> list[dict[str, Any]]:
+        if self._client:
+            result = self._client.table("teams").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+            return result.data or []
+
+        rows = [row for row in _FALLBACK.teams if str(row.get("user_id", "")) == user_id]
+        rows.sort(key=lambda item: str(item.get("created_at", "")), reverse=True)
+        return rows
+
+    def get_team(self, user_id: str, team_id: str) -> dict[str, Any] | None:
+        if self._client:
+            result = self._client.table("teams").select("*").eq("id", team_id).limit(1).execute()
+            if not result.data:
+                return None
+            row = result.data[0]
+            if str(row.get("user_id", "")) != user_id:
+                raise PermissionError(TEAM_ACCESS_ERROR_MESSAGE)
+            return row
+
+        team = self._find_fallback_team(team_id)
+        if team is None:
+            return None
+        if str(team.get("user_id", "")) != user_id:
+            raise PermissionError(TEAM_ACCESS_ERROR_MESSAGE)
+        return team
+
+    def create_team(
+        self,
+        user_id: str,
+        name: str,
+        domain: str | None = None,
+        team_id: str | None = None,
+        seed_default_agents: bool = True,
+    ) -> dict[str, Any]:
+        payload = {
+            "id": team_id or str(uuid4()),
+            "user_id": user_id,
+            "name": name,
+            "domain": domain,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        if self._client:
+            result = self._client.table("teams").insert(payload).execute()
+            if not result.data:
+                raise RuntimeError("Failed to create team")
+            row = result.data[0]
+            created_team_id = str(row.get("id", payload["id"]))
+            if seed_default_agents:
+                self._seed_default_agents(user_id=user_id, team_id=created_team_id)
+            return row
+
+        existing = self._find_fallback_team(payload["id"])
+        if existing:
+            if str(existing.get("user_id", "")) != user_id:
+                raise PermissionError(TEAM_ACCESS_ERROR_MESSAGE)
+            return existing
+
+        _FALLBACK.teams.append(payload)
+        if seed_default_agents:
+            self._seed_default_agents(user_id=user_id, team_id=payload["id"])
+        return payload
+
+    def update_team(self, user_id: str, team_id: str, **updates: Any) -> dict[str, Any]:
+        self._ensure_team_owned(user_id=user_id, team_id=team_id)
+        payload = {key: value for key, value in updates.items() if key in {"name", "domain"}}
+        if not payload:
+            existing = self.get_team(user_id=user_id, team_id=team_id)
+            if existing is None:
+                raise PermissionError(TEAM_ACCESS_ERROR_MESSAGE)
+            return existing
+
+        if self._client:
+            result = self._client.table("teams").update(payload).eq("id", team_id).execute()
+            if not result.data:
+                raise PermissionError(TEAM_ACCESS_ERROR_MESSAGE)
+            row = result.data[0]
+            if str(row.get("user_id", "")) != user_id:
+                raise PermissionError(TEAM_ACCESS_ERROR_MESSAGE)
+            return row
+
+        existing = self._find_fallback_team(team_id)
+        if existing is None:
+            raise PermissionError(TEAM_ACCESS_ERROR_MESSAGE)
+        if str(existing.get("user_id", "")) != user_id:
+            raise PermissionError(TEAM_ACCESS_ERROR_MESSAGE)
+        existing.update(payload)
+        return existing
+
+    def delete_team(self, user_id: str, team_id: str) -> None:
+        self._ensure_team_owned(user_id=user_id, team_id=team_id)
+        if self._client:
+            self._client.table("teams").delete().eq("id", team_id).execute()
+            return
+
+        _FALLBACK.teams = [row for row in _FALLBACK.teams if row.get("id") != team_id]
+        _FALLBACK.agents = [row for row in _FALLBACK.agents if row.get("team_id") != team_id]
+
+        session_ids = {row.get("id") for row in _FALLBACK.sessions if row.get("team_id") == team_id}
+        _FALLBACK.sessions = [row for row in _FALLBACK.sessions if row.get("team_id") != team_id]
+        _FALLBACK.queries = [row for row in _FALLBACK.queries if row.get("session_id") not in session_ids]
+
+        document_ids = {row.get("id") for row in _FALLBACK.documents if row.get("team_id") == team_id}
+        _FALLBACK.documents = [row for row in _FALLBACK.documents if row.get("team_id") != team_id]
+        _FALLBACK.chunks = [row for row in _FALLBACK.chunks if row.get("document_id") not in document_ids]
+
+    def list_agents(self, user_id: str, team_id: str) -> list[dict[str, Any]]:
+        self._ensure_team_owned(user_id=user_id, team_id=team_id)
+        if self._client:
+            result = self._client.table("agents").select("*").eq("team_id", team_id).order("execution_order").execute()
+            return result.data or []
+
+        rows = [row for row in _FALLBACK.agents if row.get("team_id") == team_id]
+        rows.sort(key=lambda item: (int(item.get("execution_order", 0)), str(item.get("created_at", ""))))
+        return rows
+
+    def get_agent(self, user_id: str, team_id: str, agent_id: str) -> dict[str, Any] | None:
+        self._ensure_team_owned(user_id=user_id, team_id=team_id)
+        if self._client:
+            result = self._client.table("agents").select("*").eq("id", agent_id).limit(1).execute()
+            if not result.data:
+                return None
+            row = result.data[0]
+            if str(row.get("team_id", "")) != team_id:
+                raise PermissionError(AGENT_ACCESS_ERROR_MESSAGE)
+            return row
+
+        for agent in _FALLBACK.agents:
+            if agent.get("id") != agent_id:
+                continue
+            if agent.get("team_id") != team_id:
+                raise PermissionError(AGENT_ACCESS_ERROR_MESSAGE)
+            return agent
+        return None
+
+    def create_agent(
+        self,
+        user_id: str,
+        team_id: str,
+        name: str,
+        role: str,
+        system_prompt: str,
+        model_provider: str,
+        model_name: str,
+        response_style: str,
+        execution_order: int,
+        agent_id: str | None = None,
+    ) -> dict[str, Any]:
+        self._ensure_team_owned(user_id=user_id, team_id=team_id)
+        payload = {
+            "id": agent_id or str(uuid4()),
+            "team_id": team_id,
+            "name": name,
+            "role": role,
+            "system_prompt": system_prompt,
+            "model_provider": model_provider,
+            "model_name": model_name,
+            "response_style": response_style,
+            "execution_order": execution_order,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        if self._client:
+            result = self._client.table("agents").insert(payload).execute()
+            if result.data:
+                return result.data[0]
+            raise RuntimeError("Failed to create agent")
+
+        for agent in _FALLBACK.agents:
+            if agent.get("id") != payload["id"]:
+                continue
+            if agent.get("team_id") != team_id:
+                raise PermissionError(AGENT_ACCESS_ERROR_MESSAGE)
+            return agent
+
+        _FALLBACK.agents.append(payload)
+        return payload
+
+    def update_agent(
+        self,
+        user_id: str,
+        team_id: str,
+        agent_id: str,
+        **updates: Any,
+    ) -> dict[str, Any]:
+        self._ensure_team_owned(user_id=user_id, team_id=team_id)
+        allowed_keys = {
+            "name",
+            "role",
+            "system_prompt",
+            "model_provider",
+            "model_name",
+            "response_style",
+            "execution_order",
+        }
+        payload = {key: value for key, value in updates.items() if key in allowed_keys}
+        if not payload:
+            existing = self.get_agent(user_id=user_id, team_id=team_id, agent_id=agent_id)
+            if existing is None:
+                raise PermissionError(AGENT_ACCESS_ERROR_MESSAGE)
+            return existing
+
+        if self._client:
+            result = self._client.table("agents").update(payload).eq("id", agent_id).eq("team_id", team_id).execute()
+            if not result.data:
+                raise PermissionError(AGENT_ACCESS_ERROR_MESSAGE)
+            return result.data[0]
+
+        for agent in _FALLBACK.agents:
+            if agent.get("id") != agent_id:
+                continue
+            if agent.get("team_id") != team_id:
+                raise PermissionError(AGENT_ACCESS_ERROR_MESSAGE)
+            agent.update(payload)
+            return agent
+        raise PermissionError(AGENT_ACCESS_ERROR_MESSAGE)
+
+    def delete_agent(self, user_id: str, team_id: str, agent_id: str) -> None:
+        self._ensure_team_owned(user_id=user_id, team_id=team_id)
+        if self._client:
+            result = self._client.table("agents").delete().eq("id", agent_id).eq("team_id", team_id).execute()
+            if not result.data:
+                raise PermissionError(AGENT_ACCESS_ERROR_MESSAGE)
+            return
+
+        for index, agent in enumerate(_FALLBACK.agents):
+            if agent.get("id") != agent_id:
+                continue
+            if agent.get("team_id") != team_id:
+                raise PermissionError(AGENT_ACCESS_ERROR_MESSAGE)
+            del _FALLBACK.agents[index]
+            return
+        raise PermissionError(AGENT_ACCESS_ERROR_MESSAGE)
+
+    def team_has_agents(self, user_id: str, team_id: str) -> bool:
+        self._ensure_team_owned(user_id=user_id, team_id=team_id)
+        if self._client:
+            result = self._client.table("agents").select("id").eq("team_id", team_id).limit(1).execute()
+            return bool(result.data)
+
+        return any(row.get("team_id") == team_id for row in _FALLBACK.agents)
 
     def insert_document(
         self,

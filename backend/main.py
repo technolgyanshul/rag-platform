@@ -17,6 +17,7 @@ from routers.ingest import router as ingest_router
 from routers.observability import router as observability_router
 from routers.query import router as query_router
 from routers.sessions import router as sessions_router
+from routers.teams import router as teams_router
 
 
 def configure_logging() -> None:
@@ -137,3 +138,4 @@ app.include_router(query_router)
 app.include_router(sessions_router)
 app.include_router(dashboard_router)
 app.include_router(observability_router)
+app.include_router(teams_router)
