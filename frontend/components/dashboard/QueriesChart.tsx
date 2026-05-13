@@ -1,8 +1,8 @@
 import { DashboardMetrics } from "../../lib/types";
 
-type QueriesChartProps = {
+type QueriesChartProps = Readonly<{
   metrics: DashboardMetrics | null;
-};
+}>;
 
 export function QueriesChart({ metrics }: QueriesChartProps) {
   if (!metrics || metrics.queries_over_time.length === 0) {
