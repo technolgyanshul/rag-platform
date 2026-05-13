@@ -24,7 +24,7 @@ backend/.env
 frontend/.env.local
 
 # Generated analysis artifacts
-/graphify-out/
+graphify-out/
 
 # Large design archive
 /stitch_multi_agent_rag_operator_interface.zip
