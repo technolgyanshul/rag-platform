@@ -22,12 +22,12 @@ SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2'); \
 SentenceTransformer('BAAI/bge-base-en-v1.5')"
 
 COPY --chmod=0444 main.py .
-COPY llms/ ./llms/
-COPY core/ ./core/
-COPY db/ ./db/
-COPY rag/ ./rag/
-COPY routers/ ./routers/
-COPY tests/ ./tests/
+COPY --chmod=0555 llms/ ./llms/
+COPY --chmod=0555 core/ ./core/
+COPY --chmod=0555 db/ ./db/
+COPY --chmod=0555 rag/ ./rag/
+COPY --chmod=0555 routers/ ./routers/
+COPY --chmod=0555 tests/ ./tests/
 RUN chmod -R a=rX /app
 
 ENV TRANSFORMERS_OFFLINE=1 \
@@ -49,16 +49,16 @@ ENV HOME=/home/app \
     XDG_CACHE_HOME=/home/app/.cache
 
 # copy installed packages from deps stage (avoids re-downloading)
-COPY --from=deps /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=deps /usr/local/bin /usr/local/bin
+COPY --from=deps --chmod=0555 /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=deps --chmod=0555 /usr/local/bin /usr/local/bin
 
 # only copy application source, not tests/docs
 COPY --chown=app:app --chmod=0444 main.py .
-COPY --chown=app:app llms/ ./llms/
-COPY --chown=app:app core/ ./core/
-COPY --chown=app:app db/ ./db/
-COPY --chown=app:app rag/ ./rag/
-COPY --chown=app:app routers/ ./routers/
+COPY --chown=app:app --chmod=0555 llms/ ./llms/
+COPY --chown=app:app --chmod=0555 core/ ./core/
+COPY --chown=app:app --chmod=0555 db/ ./db/
+COPY --chown=app:app --chmod=0555 rag/ ./rag/
+COPY --chown=app:app --chmod=0555 routers/ ./routers/
 RUN chmod -R a=rX /app
 
 USER app
