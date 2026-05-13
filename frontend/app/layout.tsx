@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description: "Operator console for RAG workflows"
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
       <head>

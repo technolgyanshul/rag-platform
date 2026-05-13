@@ -22,7 +22,14 @@ class SessionResponse(BaseModel):
     created_at: str
 
 
-@router.post("", response_model=SessionResponse, responses={403: {"description": "Forbidden"}})
+@router.post(
+    "",
+    response_model=SessionResponse,
+    responses={
+        403: {"description": "Forbidden"},
+        503: {"description": "Session service temporarily unavailable"},
+    },
+)
 async def create_session(
     payload: CreateSessionRequest,
     request: Request,

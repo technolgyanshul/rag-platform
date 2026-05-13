@@ -37,7 +37,7 @@ def embed_file_semantic(file_path: str, file_type: str) -> list[EmbeddedChunk]:
     non_empty_file = path.exists() and path.stat().st_size > 0
 
     try:
-        raw_chunks = _embed_file_with_embedanything(str(path), normalized_type)
+        raw_chunks = _embed_file_with_embedanything(str(path))
     except ImportError as exc:
         raise RuntimeError(
             "embed-anything is required for semantic embedding. Install it with: pip install embed-anything"
@@ -59,7 +59,7 @@ def embed_query(query: str) -> list[float]:
     return _normalize_embedding(raw_embedding)
 
 
-def _embed_file_with_embedanything(file_path: str, file_type: str) -> Iterable[Any]:
+def _embed_file_with_embedanything(file_path: str) -> Iterable[Any]:
     embed_anything = _import_embedanything()
     model = _get_embedding_model(embed_anything)
     config = _get_text_embed_config(embed_anything)

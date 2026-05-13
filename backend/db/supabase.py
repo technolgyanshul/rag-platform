@@ -512,7 +512,7 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     dot = sum(x * y for x, y in zip(a_vec, b_vec))
     norm_a = math.sqrt(sum(x * x for x in a_vec))
     norm_b = math.sqrt(sum(y * y for y in b_vec))
-    if norm_a == 0.0 or norm_b == 0.0:
+    if math.isclose(norm_a, 0.0) or math.isclose(norm_b, 0.0):
         return 0.0
     return dot / (norm_a * norm_b)
 

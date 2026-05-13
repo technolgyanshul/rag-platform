@@ -1,8 +1,8 @@
 import { QueryUiState } from "../../lib/types";
 
-type ChatWindowProps = {
+type ChatWindowProps = Readonly<{
   queryState: QueryUiState;
-};
+}>;
 
 export function ChatWindow({ queryState }: ChatWindowProps) {
   if (queryState.status === "idle") {

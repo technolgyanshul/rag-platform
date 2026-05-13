@@ -11,7 +11,7 @@ from main import app
 pytestmark = pytest.mark.anyio
 
 
-async def _client() -> httpx.AsyncClient:
+def _client() -> httpx.AsyncClient:
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test")
 
 
@@ -26,7 +26,7 @@ class FakeQdrantVectorBackend:
 
 
 async def test_ingest_rejects_unsupported_file_type() -> None:
-    async with await _client() as client:
+    async with _client() as client:
         response = await client.post(
             "/ingest",
             files={"file": ("notes.md", b"hello", "text/markdown")},
@@ -37,7 +37,7 @@ async def test_ingest_rejects_unsupported_file_type() -> None:
 
 
 async def test_ingest_rejects_empty_payload() -> None:
-    async with await _client() as client:
+    async with _client() as client:
         response = await client.post(
             "/ingest",
             files={"file": ("empty.txt", b"", "text/plain")},
@@ -72,7 +72,7 @@ async def test_ingest_writes_temp_file_and_indexes_qdrant_points(monkeypatch) ->
         },
     )
 
-    async with await _client() as client:
+    async with _client() as client:
         response = await client.post(
             "/ingest",
             files={"file": ("notes.txt", b"hello", "text/plain")},
@@ -101,7 +101,7 @@ async def test_ingest_records_failed_index_status_on_qdrant_failure(monkeypatch)
         },
     )
 
-    async with await _client() as client:
+    async with _client() as client:
         response = await client.post(
             "/ingest",
             files={"file": ("notes.txt", b"hello", "text/plain")},
@@ -115,15 +115,16 @@ async def test_ingest_records_failed_index_status_on_qdrant_failure(monkeypatch)
 
 
 async def test_ingest_openapi_documents_error_responses() -> None:
-    async with await _client() as client:
+    async with _client() as client:
         schema = (await client.get("/openapi.json")).json()
 
     assert {"400", "403", "500", "503"}.issubset(schema["paths"]["/ingest"]["post"]["responses"])
     assert {"403", "503"}.issubset(schema["paths"]["/ingest/documents"]["get"]["responses"])
+    assert {"403", "503"}.issubset(schema["paths"]["/sessions"]["post"]["responses"])
 
 
 async def test_query_history_requires_non_empty_session_id() -> None:
-    async with await _client() as client:
+    async with _client() as client:
         response = await client.get("/query/history", params={"session_id": "", "limit": 10})
 
     assert response.status_code == 422
@@ -134,7 +135,7 @@ async def test_query_rejects_session_from_other_user() -> None:
     session_id = "30000000-0000-0000-0000-000000000003"
     repository.create_session(user_id="99999999-0000-0000-0000-000000000999", session_id=session_id)
 
-    async with await _client() as client:
+    async with _client() as client:
         response = await client.post(
             "/query",
             json={"query": "mismatch", "session_id": session_id, "top_k": 1},

@@ -2,11 +2,11 @@
 
 import { FormEvent, useState } from "react";
 
-type QueryInputProps = {
+type QueryInputProps = Readonly<{
   onSubmit: (payload: { sessionId: string; query: string; topK: number }) => Promise<void>;
   onCreateSession: () => Promise<string>;
   disabled?: boolean;
-};
+}>;
 
 export function QueryInput({ onSubmit, onCreateSession, disabled = false }: QueryInputProps) {
   const [sessionId, setSessionId] = useState("");

@@ -17,7 +17,7 @@ def test_embed_file_semantic_normalizes_embedanything_output(monkeypatch: pytest
         SimpleNamespace(text="alpha beta", embedding=[0.1, 0.2], metadata={"page": 1}),
         {"text": "gamma", "embedding": (0.3, 0.4), "metadata": {"page": 2}},
     ]
-    monkeypatch.setattr(pipeline, "_embed_file_with_embedanything", lambda path, file_type: raw_chunks)
+    monkeypatch.setattr(pipeline, "_embed_file_with_embedanything", lambda path: raw_chunks)
 
     chunks = pipeline.embed_file_semantic(str(file_path), "TXT")
 
@@ -47,7 +47,7 @@ def test_missing_embedanything_dependency_fails_clearly(monkeypatch: pytest.Monk
     file_path = tmp_path / "source.txt"
     file_path.write_text("content", encoding="utf-8")
 
-    def missing_dependency(path: str, file_type: str) -> list[object]:
+    def missing_dependency(path: str) -> list[object]:
         raise ImportError("No module named 'embed_anything'")
 
     monkeypatch.setattr(pipeline, "_embed_file_with_embedanything", missing_dependency)
@@ -69,7 +69,7 @@ def test_non_empty_file_with_no_semantic_content_fails(
 ) -> None:
     file_path = tmp_path / "source.txt"
     file_path.write_text("content that should produce chunks", encoding="utf-8")
-    monkeypatch.setattr(pipeline, "_embed_file_with_embedanything", lambda path, file_type: [])
+    monkeypatch.setattr(pipeline, "_embed_file_with_embedanything", lambda path: [])
 
     with pytest.raises(RuntimeError, match="Semantic chunking returned no content"):
         pipeline.embed_file_semantic(str(file_path), "txt")
@@ -78,7 +78,7 @@ def test_non_empty_file_with_no_semantic_content_fails(
 def test_empty_file_may_return_no_chunks(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     file_path = tmp_path / "empty.txt"
     file_path.write_text("", encoding="utf-8")
-    monkeypatch.setattr(pipeline, "_embed_file_with_embedanything", lambda path, file_type: [])
+    monkeypatch.setattr(pipeline, "_embed_file_with_embedanything", lambda path: [])
 
     assert pipeline.embed_file_semantic(str(file_path), "txt") == []
 
@@ -89,7 +89,7 @@ def test_missing_embedding_dimension_fails(monkeypatch: pytest.MonkeyPatch, tmp_
     monkeypatch.setattr(
         pipeline,
         "_embed_file_with_embedanything",
-        lambda path, file_type: [SimpleNamespace(text="content", embedding=[], metadata={})],
+        lambda path: [SimpleNamespace(text="content", embedding=[], metadata={})],
     )
 
     with pytest.raises(RuntimeError, match="Embedding dimension cannot be determined"):
@@ -102,7 +102,7 @@ def test_inconsistent_embedding_dimensions_fail(monkeypatch: pytest.MonkeyPatch,
     monkeypatch.setattr(
         pipeline,
         "_embed_file_with_embedanything",
-        lambda path, file_type: [
+        lambda path: [
             SimpleNamespace(text="first", embedding=[0.1, 0.2], metadata={}),
             SimpleNamespace(text="second", embedding=[0.3], metadata={}),
         ],
@@ -118,7 +118,7 @@ def test_source_type_metadata_is_normalized(monkeypatch: pytest.MonkeyPatch, tmp
     monkeypatch.setattr(
         pipeline,
         "_embed_file_with_embedanything",
-        lambda path, file_type: [
+        lambda path: [
             {"content": "markdown content", "embedding": [0.1], "metadata": {"source_type": "wrong"}}
         ],
     )

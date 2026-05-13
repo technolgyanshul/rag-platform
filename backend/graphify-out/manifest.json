@@ -1,0 +1,186 @@
+{
+  "/home/anshulgarg/Documents/RAG-platform/backend/main.py": {
+    "mtime": 1778593199.842388,
+    "hash": "199cbfce976bf376571cccba0049a3c6"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/observability.py": {
+    "mtime": 1778592549.602051,
+    "hash": "a4394b2fcede9b89d6baa8cf62ccf2e0"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/llms/sarvam_client.py": {
+    "mtime": 1778590019.4890022,
+    "hash": "6873597bad74c922f9ebfa2e1fc83c85"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/llms/groq_client.py": {
+    "mtime": 1778222337.9731145,
+    "hash": "96e323b4ba5efc7d2507c4e6c83c22ac"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/conftest.py": {
+    "mtime": 1778591442.613906,
+    "hash": "db5a116646d4b7a02c7ee0cf6bd2297d"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/integration/test_dashboard_history.py": {
+    "mtime": 1778591754.8213222,
+    "hash": "b70952d8cc06ebbf29de394ac7e5e8fb"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/integration/test_failure_cases.py": {
+    "mtime": 1778591594.4898536,
+    "hash": "f88ceb28b966097182c7fba992950b88"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/integration/test_sessions.py": {
+    "mtime": 1778591754.6993933,
+    "hash": "eba86c007f752803e8c6c0da5316ce1c"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/integration/test_observability_events.py": {
+    "mtime": 1778593176.3801262,
+    "hash": "aab5f9dca6a2042319c898f1a2b463fc"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/integration/test_placeholder.py": {
+    "mtime": 1778591442.8419292,
+    "hash": "679a211faa9695b2be117be889c7366f"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/integration/test_qdrant_embedanything_smoke.py": {
+    "mtime": 1778591668.438498,
+    "hash": "3680d0b036d2d6c80e1d73cdb56255ac"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/integration/test_file_persistence.py": {
+    "mtime": 1778590484.1101685,
+    "hash": "a179d20cbd4e0d22e93ed934bb21e97c"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/unit/test_dockerfile_security.py": {
+    "mtime": 1778568082.6639128,
+    "hash": "4fc7605da87fa6227db533da7743485d"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/unit/test_embedanything_pipeline.py": {
+    "mtime": 1778590732.0102904,
+    "hash": "587fa25f44b9c076ae6976c5c7178a54"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/unit/test_retriever_contract.py": {
+    "mtime": 1778590898.5599475,
+    "hash": "3fceedfde31efca150625bc27088b73a"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/unit/test_config.py": {
+    "mtime": 1778590469.3721309,
+    "hash": "2039972df9a6479686fd321a7208f31b"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/unit/test_cors_config.py": {
+    "mtime": 1778590098.0382817,
+    "hash": "291126c8d36f76d8e2224aa03d39249f"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/unit/test_observability.py": {
+    "mtime": 1778591428.1674752,
+    "hash": "d8130c8e41ee2c3847d7ad534623bfb1"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/unit/test_chunking.py": {
+    "mtime": 1777487318.5032954,
+    "hash": "87d43fe4c025f4cea560889912c5e37a"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/unit/test_health_placeholder.py": {
+    "mtime": 1777485188.619339,
+    "hash": "dc8b43486d87826d4f2db96331e308de"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/unit/test_grafana_compose.py": {
+    "mtime": 1778593490.5854142,
+    "hash": "4c5155f9e36a89ef6f7c934cd777dbd3"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/unit/test_auth_config.py": {
+    "mtime": 1778220585.256061,
+    "hash": "8e64c81e06c54d1734dc147a38e86d60"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/unit/test_embeddings.py": {
+    "mtime": 1778591893.809144,
+    "hash": "94194a1c960e56723b98617df97b3aee"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/unit/test_ingest_txt.py": {
+    "mtime": 1778590898.4369547,
+    "hash": "c15a701e0e8db2d59a504f3affc0e5c7"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/unit/test_query_persistence.py": {
+    "mtime": 1778589886.898249,
+    "hash": "342ddafcfe00e1309d9e5eb4af6005ce"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/tests/unit/test_qdrant_backend.py": {
+    "mtime": 1778590511.863713,
+    "hash": "a2cacf3f733b99700498110c880fab56"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/db/supabase.py": {
+    "mtime": 1778600957.5316365,
+    "hash": "ae8e4b687064299a2e2bc63254c55847"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/rag/image_text.py": {
+    "mtime": 1778223788.1851587,
+    "hash": "645e2fd9e23598490d88a68649b1387a"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/rag/ingest.py": {
+    "mtime": 1778590897.979183,
+    "hash": "6dd5fcb6d881b26d48346a8a3ae024d4"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/rag/qdrant_backend.py": {
+    "mtime": 1778591047.0652626,
+    "hash": "99b356af6b6fe91c62feba60ac50bf1b"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/rag/vector_backend.py": {
+    "mtime": 1778590543.081426,
+    "hash": "eb887e9ca301626757a08c56b8dd35fe"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/rag/embeddings.py": {
+    "mtime": 1778223824.1121597,
+    "hash": "9622da2a5b346a9c36a544ba6de32ba1"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/rag/retriever.py": {
+    "mtime": 1778590898.2049685,
+    "hash": "4990b102c54245313112063ca65908f3"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/rag/chunking.py": {
+    "mtime": 1777487184.7669823,
+    "hash": "6ddf65a2d5bd890c886658d767bda627"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/rag/embedanything_pipeline.py": {
+    "mtime": 1778592131.555871,
+    "hash": "725c131f30dfcfa2cc68cac037c71d7e"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/rag/generator.py": {
+    "mtime": 1778589900.0902135,
+    "hash": "02113b25cfeb915e7b08372010719f9f"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/core/auth.py": {
+    "mtime": 1778220585.255061,
+    "hash": "57b66f009be0878063085b927b94c878"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/core/cors.py": {
+    "mtime": 1777542257.7785637,
+    "hash": "5bac269e791591734088e341ddb08607"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/core/config.py": {
+    "mtime": 1778591893.9281263,
+    "hash": "57447f29f34e8d474a873d72f16be609"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/routers/query.py": {
+    "mtime": 1778592667.8208468,
+    "hash": "b8a8cd8d0e15988ca1feae6fd8a702ed"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/routers/dashboard.py": {
+    "mtime": 1778592907.3514502,
+    "hash": "f81309c1573e7c1644bc8e04569386d7"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/routers/ingest.py": {
+    "mtime": 1778592864.8534963,
+    "hash": "98c021738bed5cde12ba01b278789e66"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/routers/health.py": {
+    "mtime": 1778592907.4654555,
+    "hash": "68c8e827b3b34c723b9cdb4a5aa5cecb"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/routers/observability.py": {
+    "mtime": 1778592549.7160528,
+    "hash": "85289520eda12003cfbd700288c0c5fe"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/routers/sessions.py": {
+    "mtime": 1778592907.2454453,
+    "hash": "4cc294a0f980cd9097cc55e3b5c3ced8"
+  },
+  "/home/anshulgarg/Documents/RAG-platform/backend/requirements.txt": {
+    "mtime": 1778593138.8881264,
+    "hash": "dac66330802895e207bbc64a6b8b4031"
+  }
+}

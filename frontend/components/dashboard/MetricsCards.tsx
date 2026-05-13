@@ -1,8 +1,8 @@
 import { DashboardMetrics } from "../../lib/types";
 
-type MetricsCardsProps = {
+type MetricsCardsProps = Readonly<{
   metrics: DashboardMetrics | null;
-};
+}>;
 
 export function MetricsCards({ metrics }: MetricsCardsProps) {
   if (!metrics) {

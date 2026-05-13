@@ -25,7 +25,9 @@ export default function KnowledgePage() {
   const [message, setMessage] = useState("Upload a document to populate the demo knowledge base.");
 
   useEffect(() => {
-    void logUiEvent({ event_name: "page_view", page: "/knowledge", component: "KnowledgePage", action: "load" }).catch(() => undefined);
+    void logUiEvent({ event_name: "page_view", page: "/knowledge", component: "KnowledgePage", action: "load" }).catch((error: unknown) => {
+      console.error("Failed to log knowledge page view event", error);
+    });
   }, []);
 
   const refreshDocuments = async () => {
@@ -37,7 +39,9 @@ export default function KnowledgePage() {
         component: "KnowledgePage",
         action: "refresh_documents",
         payload: { row_count: rows.length, documents: rows },
-      }).catch(() => undefined);
+      }).catch((eventError: unknown) => {
+        console.error("Failed to log documents refresh success event", eventError);
+      });
       setDocuments(rows);
       setMessage(rows.length ? "" : "No documents uploaded yet.");
     } catch (error) {
@@ -47,7 +51,9 @@ export default function KnowledgePage() {
         component: "KnowledgePage",
         action: "refresh_documents",
         payload: { error: error instanceof Error ? error.message : String(error) },
-      }).catch(() => undefined);
+      }).catch((eventError: unknown) => {
+        console.error("Failed to log documents refresh failure event", eventError);
+      });
       setMessage("Could not load uploaded documents.");
     }
   };
@@ -61,7 +67,9 @@ export default function KnowledgePage() {
         component: "KnowledgePage",
         action: "open_document",
         payload: { document_id: documentId, url },
-      }).catch(() => undefined);
+      }).catch((eventError: unknown) => {
+        console.error("Failed to log document open success event", eventError);
+      });
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (error) {
       await logUiEvent({
@@ -70,7 +78,9 @@ export default function KnowledgePage() {
         component: "KnowledgePage",
         action: "open_document",
         payload: { document_id: documentId, error: error instanceof Error ? error.message : String(error) },
-      }).catch(() => undefined);
+      }).catch((eventError: unknown) => {
+        console.error("Failed to log document open failure event", eventError);
+      });
       setMessage("Could not open the stored source file.");
     }
   };

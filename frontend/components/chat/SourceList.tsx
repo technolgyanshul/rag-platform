@@ -1,8 +1,8 @@
 import { Source } from "../../lib/types";
 
-type SourceListProps = {
-  sources: Source[];
-};
+type SourceListProps = Readonly<{
+  sources: readonly Source[];
+}>;
 
 export function SourceList({ sources }: SourceListProps) {
   if (sources.length === 0) {
