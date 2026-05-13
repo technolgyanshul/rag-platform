@@ -51,7 +51,8 @@ def test_collection_created_once_with_cosine_distance() -> None:
     backend.upsert_points([point])
 
     assert len(client.create_collection_calls) == 1
-    created = client.create_collection_calls[0]
+    created = next(iter(client.create_collection_calls), None)
+    assert created is not None
     assert created["collection_name"] == "rag_chunks"
     assert created["vectors_config"].size == 3
     assert created["vectors_config"].distance.value == "Cosine"
@@ -125,8 +126,10 @@ def test_search_applies_user_id_filter_and_sorts_by_score() -> None:
     assert user_filter.match.value == "user-a"
     assert len(rows) == 2
     assert [row.document_id for row in rows] == ["doc-high", "doc-low"]
-    assert rows[0].score == pytest.approx(0.9)
-    assert rows[0].metadata == {"section": "intro"}
+    first_row = next(iter(rows), None)
+    assert first_row is not None
+    assert first_row.score == pytest.approx(0.9)
+    assert first_row.metadata == {"section": "intro"}
 
 
 def _point(

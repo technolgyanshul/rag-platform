@@ -63,7 +63,7 @@ export default function DashboardPage() {
         <div className="card">
           <form className="split-3" onSubmit={handleLoad}>
             <label>
-              Session ID
+              Session ID{" "}
               <input
                 id="dashboard-session-id"
                 value={sessionId}
@@ -72,7 +72,7 @@ export default function DashboardPage() {
               />
             </label>
             <label>
-              Time Window (days)
+              Time Window (days){" "}
               <input
                 id="dashboard-days"
                 type="number"

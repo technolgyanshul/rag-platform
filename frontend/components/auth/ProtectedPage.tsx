@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 
 import { createClient } from "@/utils/supabase/client";
 
-type ProtectedPageProps = {
+type ProtectedPageProps = Readonly<{
   children: React.ReactNode;
-};
+}>;
 
 export function ProtectedPage({ children }: ProtectedPageProps) {
   const router = useRouter();

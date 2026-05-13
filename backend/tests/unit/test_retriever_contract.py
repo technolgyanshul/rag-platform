@@ -31,7 +31,11 @@ def test_retrieve_chunks_embeds_query_and_searches_qdrant(monkeypatch) -> None:
     user_id = "00000000-0000-0000-0000-000000000001"
     rows = retrieve_chunks(query="retrieval", user_id=user_id, top_k=1)
 
-    assert FakeQdrantVectorBackend.calls == [{"query_vector": [0.2, 0.3], "user_id": user_id, "top_k": 1}]
+    assert len(FakeQdrantVectorBackend.calls) == 1
+    call = FakeQdrantVectorBackend.calls[0]
+    assert call["query_vector"] == pytest.approx([0.2, 0.3])
+    assert call["user_id"] == user_id
+    assert call["top_k"] == 1
     assert len(rows) == 1
     assert rows[0]["document_id"] == "doc-1"
     assert rows[0]["similarity"] == pytest.approx(0.88)
