@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+// TypeScript cannot infer types for local .mjs config imports in this test context.
+// @ts-expect-error - covered by runtime test expectations below.
 import nextConfig from "./next.config.mjs";
 
 describe("nextConfig", () => {

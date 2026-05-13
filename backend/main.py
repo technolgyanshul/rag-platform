@@ -4,9 +4,9 @@ from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI
-from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.responses import Response
+from starlette.datastructures import MutableHeaders
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 import observability
 from core.cors import get_cors_origins
@@ -30,6 +30,88 @@ def configure_logging() -> None:
 configure_logging()
 
 
+class RequestIdObservabilityMiddleware:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        request_id = self._header(scope, "x-request-id") or str(uuid4())
+        scope.setdefault("state", {})
+        scope["state"]["request_id"] = request_id
+        started_at = time.perf_counter()
+        observer = observability.get_observability()
+        route = str(scope.get("path", ""))
+        metadata = {
+            "method": str(scope.get("method", "")),
+            "path": route,
+            "query_params": {},
+            "headers": self._headers_dict(scope),
+            "client": scope["client"][0] if scope.get("client") else "",
+        }
+        observer.record_trace_event(
+            event_name="http_request_started",
+            request_id=request_id,
+            route=route,
+            component="fastapi",
+            metadata=metadata,
+        )
+
+        status_code = "500"
+
+        async def send_wrapper(message: Message) -> None:
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = str(message.get("status", 500))
+                headers = MutableHeaders(raw=message["headers"])
+                headers.append("x-request-id", request_id)
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_wrapper)
+        except Exception as error:
+            observer.record_trace_event(
+                event_name="http_request_failed",
+                request_id=request_id,
+                route=route,
+                component="fastapi",
+                level="ERROR",
+                status="exception",
+                duration_ms=int((time.perf_counter() - started_at) * 1000),
+                metadata=metadata,
+                error=error,
+            )
+            raise
+
+        observer.record_trace_event(
+            event_name="http_request_finished",
+            request_id=request_id,
+            route=route,
+            component="fastapi",
+            status=status_code,
+            duration_ms=int((time.perf_counter() - started_at) * 1000),
+            metadata=metadata,
+        )
+
+    @staticmethod
+    def _header(scope: Scope, name: str) -> str | None:
+        target = name.lower().encode()
+        for key, value in scope.get("headers", []):
+            if key.lower() == target:
+                return value.decode("latin-1")
+        return None
+
+    @staticmethod
+    def _headers_dict(scope: Scope) -> dict[str, str]:
+        headers: dict[str, str] = {}
+        for key, value in scope.get("headers", []):
+            headers[key.decode("latin-1")] = value.decode("latin-1")
+        return headers
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     observability.get_observability().initialize()
@@ -37,6 +119,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Multi-Agent RAG Backend", version="0.1.0", lifespan=lifespan)
+
+app.add_middleware(RequestIdObservabilityMiddleware)
 
 cors_origins = get_cors_origins()
 app.add_middleware(
@@ -53,52 +137,3 @@ app.include_router(query_router)
 app.include_router(sessions_router)
 app.include_router(dashboard_router)
 app.include_router(observability_router)
-
-
-@app.middleware("http")
-async def request_id_middleware(request: Request, call_next) -> Response:
-    request_id = request.headers.get("x-request-id") or str(uuid4())
-    request.state.request_id = request_id
-    started_at = time.perf_counter()
-    observer = observability.get_observability()
-    route = request.url.path
-    metadata = {
-        "method": request.method,
-        "path": route,
-        "query_params": dict(request.query_params),
-        "headers": dict(request.headers),
-        "client": request.client.host if request.client else "",
-    }
-    observer.record_trace_event(
-        event_name="http_request_started",
-        request_id=request_id,
-        route=route,
-        component="fastapi",
-        metadata=metadata,
-    )
-    try:
-        response = await call_next(request)
-    except Exception as error:
-        observer.record_trace_event(
-            event_name="http_request_failed",
-            request_id=request_id,
-            route=route,
-            component="fastapi",
-            level="ERROR",
-            status="exception",
-            duration_ms=int((time.perf_counter() - started_at) * 1000),
-            metadata=metadata,
-            error=error,
-        )
-        raise
-    response.headers["x-request-id"] = request_id
-    observer.record_trace_event(
-        event_name="http_request_finished",
-        request_id=request_id,
-        route=route,
-        component="fastapi",
-        status=str(response.status_code),
-        duration_ms=int((time.perf_counter() - started_at) * 1000),
-        metadata=metadata,
-    )
-    return response

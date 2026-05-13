@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useState } from "react";
 
 import { Header } from "./Header";
 import { NavItem, Sidebar } from "./Sidebar";
@@ -24,10 +24,6 @@ const navItems: NavItem[] = [
 export function AppShell({ title, subtitle, actions, children }: AppShellProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
 
   return (
     <div className="app-shell">

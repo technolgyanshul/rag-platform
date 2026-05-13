@@ -19,7 +19,7 @@ def _auth_override_and_env() -> Generator[None, None, None]:
     os.environ["ALLOW_INMEMORY_REPOSITORY"] = "true"
     reset_fallback_store()
 
-    def _test_user() -> AuthUser:
+    async def _test_user() -> AuthUser:
         return AuthUser(user_id="00000000-0000-0000-0000-000000000001", email="test@example.com")
 
     app.dependency_overrides[get_current_user] = _test_user
