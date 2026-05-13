@@ -18,6 +18,19 @@ def _parse_int(name: str, default: int, min_value: int) -> int:
     return value
 
 
+def _parse_float(name: str, default: float, min_value: float) -> float:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        value = float(raw_value)
+    except ValueError as exc:
+        raise ValueError(f"Invalid float for {name}: {raw_value}") from exc
+    if value < min_value:
+        raise ValueError(f"{name} must be >= {min_value}, got {value}")
+    return value
+
+
 def _parse_bool(name: str, default: bool) -> bool:
     raw_value = os.getenv(name)
     if raw_value is None:
@@ -52,6 +65,10 @@ class Settings:
     clickhouse_password: str
     clickhouse_strict: bool
     clickhouse_log_raw_payloads: bool
+    clickhouse_connect_timeout_seconds: float
+    clickhouse_read_timeout_seconds: float
+    clickhouse_init_max_retries: int
+    clickhouse_init_retry_backoff_seconds: float
 
 
 @lru_cache(maxsize=1)
@@ -74,7 +91,7 @@ def get_settings() -> Settings:
         dashboard_days_default=_parse_int("DASHBOARD_DAYS_DEFAULT", default=7, min_value=1),
         dashboard_days_max=_parse_int("DASHBOARD_DAYS_MAX", default=30, min_value=1),
         allowed_file_types=allowed,
-        qdrant_url=os.getenv("QDRANT_URL", "https://qdrant:6333"),
+        qdrant_url=os.getenv("QDRANT_URL", "http://qdrant:6333"),
         qdrant_collection=os.getenv("QDRANT_COLLECTION", "rag_documents"),
         embedanything_model=os.getenv("EMBEDANYTHING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"),
         embedanything_chunk_strategy=os.getenv("EMBEDANYTHING_CHUNK_STRATEGY", "semantic"),
@@ -90,4 +107,8 @@ def get_settings() -> Settings:
         clickhouse_password=os.getenv("CLICKHOUSE_PASSWORD", ""),
         clickhouse_strict=_parse_bool("CLICKHOUSE_STRICT", default=True),
         clickhouse_log_raw_payloads=_parse_bool("CLICKHOUSE_LOG_RAW_PAYLOADS", default=False),
+        clickhouse_connect_timeout_seconds=_parse_float("CLICKHOUSE_CONNECT_TIMEOUT_SECONDS", default=5.0, min_value=0.1),
+        clickhouse_read_timeout_seconds=_parse_float("CLICKHOUSE_READ_TIMEOUT_SECONDS", default=15.0, min_value=0.1),
+        clickhouse_init_max_retries=_parse_int("CLICKHOUSE_INIT_MAX_RETRIES", default=2, min_value=0),
+        clickhouse_init_retry_backoff_seconds=_parse_float("CLICKHOUSE_INIT_RETRY_BACKOFF_SECONDS", default=1.0, min_value=0.0),
     )

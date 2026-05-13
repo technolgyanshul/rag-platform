@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import traceback
 from datetime import UTC, datetime
 from typing import Any
@@ -85,7 +86,6 @@ class ClickHouseObservability:
     def initialize(self) -> None:
         if not self.enabled:
             return
-        client = self._get_client()
         statements = [
             f"CREATE DATABASE IF NOT EXISTS {self.database}",
             f"""
@@ -134,11 +134,32 @@ class ClickHouseObservability:
             ORDER BY (event_time, service)
             """,
         ]
-        try:
-            for statement in statements:
-                client.command(statement)
-        except Exception:
-            self._handle_write_failure()
+        settings = get_settings()
+        attempts = settings.clickhouse_init_max_retries + 1
+        for attempt in range(1, attempts + 1):
+            try:
+                client = self._get_client()
+                for statement in statements:
+                    client.command(statement)
+                return
+            except Exception:
+                if attempt >= attempts:
+                    self._handle_write_failure()
+                    return
+                logger.warning(
+                    "clickhouse_observability_initialize_retry",
+                    extra={
+                        "attempt": attempt,
+                        "max_attempts": attempts,
+                        "host": settings.clickhouse_host,
+                        "connect_timeout_seconds": settings.clickhouse_connect_timeout_seconds,
+                        "read_timeout_seconds": settings.clickhouse_read_timeout_seconds,
+                        "strict": self.strict,
+                    },
+                    exc_info=True,
+                )
+                if settings.clickhouse_init_retry_backoff_seconds > 0:
+                    time.sleep(settings.clickhouse_init_retry_backoff_seconds)
 
     def record_trace_event(
         self,
@@ -290,15 +311,18 @@ class ClickHouseObservability:
             password=settings.clickhouse_password,
             database=settings.clickhouse_database,
             secure=secure,
-            connect_timeout=2,
-            send_receive_timeout=3,
+            connect_timeout=settings.clickhouse_connect_timeout_seconds,
+            send_receive_timeout=settings.clickhouse_read_timeout_seconds,
         )
         return self._client
 
     def _handle_write_failure(self) -> None:
         if self.strict:
             raise
-        logger.exception("clickhouse_observability_write_failed")
+        logger.exception(
+            "clickhouse_observability_write_failed; continuing with observability disabled behavior. "
+            "Check CLICKHOUSE_HOST/credentials/network or set CLICKHOUSE_STRICT=false for local development."
+        )
 
 
 _OBSERVABILITY: ClickHouseObservability | None = None

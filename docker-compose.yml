@@ -7,19 +7,23 @@ services:
     env_file:
       - .env
     environment:
-      - CLICKHOUSE_ENABLED=${CLICKHOUSE_ENABLED:-true}
-      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST:?Set CLICKHOUSE_HOST to your ClickHouse Cloud HTTPS URL}
+      - CLICKHOUSE_ENABLED=${CLICKHOUSE_ENABLED:-false}
+      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST:-}
       - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE:-rag_logs}
       - CLICKHOUSE_USERNAME=${CLICKHOUSE_USERNAME:-default}
       - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
-      - CLICKHOUSE_STRICT=${CLICKHOUSE_STRICT:-true}
+      - CLICKHOUSE_STRICT=${CLICKHOUSE_STRICT:-false}
       - CLICKHOUSE_LOG_RAW_PAYLOADS=${CLICKHOUSE_LOG_RAW_PAYLOADS:-false}
+      - CLICKHOUSE_CONNECT_TIMEOUT_SECONDS=${CLICKHOUSE_CONNECT_TIMEOUT_SECONDS:-5}
+      - CLICKHOUSE_READ_TIMEOUT_SECONDS=${CLICKHOUSE_READ_TIMEOUT_SECONDS:-15}
+      - CLICKHOUSE_INIT_MAX_RETRIES=${CLICKHOUSE_INIT_MAX_RETRIES:-2}
+      - CLICKHOUSE_INIT_RETRY_BACKOFF_SECONDS=${CLICKHOUSE_INIT_RETRY_BACKOFF_SECONDS:-1}
     volumes:
       - ./backend:/app
     depends_on:
       qdrant:
         condition: service_healthy
-    restart: unless-stopped
+    restart: "no"
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -37,10 +41,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    restart: unless-stopped
+    restart: "no"
 
   frontend:
     build: ./frontend
+    user: "${UID:-1001}:${GID:-1001}"
     command: npm run dev -- --hostname 0.0.0.0 --port 3000
     ports:
       - "3000:3000"
@@ -55,14 +60,14 @@ services:
       - /app/node_modules
     depends_on:
       - backend
-    restart: unless-stopped
+    restart: "no"
 
   cloudflared:
     image: cloudflare/cloudflared:latest
     command: tunnel --protocol http2 --no-autoupdate run --token ${CLOUDFLARED_TOKEN:?Set CLOUDFLARED_TOKEN in .env}
     depends_on:
       - frontend
-    restart: unless-stopped
+    restart: "no"
 
   test:
     build:

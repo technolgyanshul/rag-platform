@@ -21,6 +21,10 @@ def test_clickhouse_settings_defaults_disabled(monkeypatch: pytest.MonkeyPatch) 
         "CLICKHOUSE_PASSWORD",
         "CLICKHOUSE_STRICT",
         "CLICKHOUSE_LOG_RAW_PAYLOADS",
+        "CLICKHOUSE_CONNECT_TIMEOUT_SECONDS",
+        "CLICKHOUSE_READ_TIMEOUT_SECONDS",
+        "CLICKHOUSE_INIT_MAX_RETRIES",
+        "CLICKHOUSE_INIT_RETRY_BACKOFF_SECONDS",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -33,6 +37,10 @@ def test_clickhouse_settings_defaults_disabled(monkeypatch: pytest.MonkeyPatch) 
     assert settings.clickhouse_password == ""
     assert settings.clickhouse_strict is True
     assert settings.clickhouse_log_raw_payloads is False
+    assert settings.clickhouse_connect_timeout_seconds == 5.0
+    assert settings.clickhouse_read_timeout_seconds == 15.0
+    assert settings.clickhouse_init_max_retries == 2
+    assert settings.clickhouse_init_retry_backoff_seconds == 1.0
 
 
 def test_clickhouse_settings_accept_cloud_connection_values(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -43,6 +51,10 @@ def test_clickhouse_settings_accept_cloud_connection_values(monkeypatch: pytest.
     monkeypatch.setenv("CLICKHOUSE_PASSWORD", "cloud_password")
     monkeypatch.setenv("CLICKHOUSE_STRICT", "true")
     monkeypatch.setenv("CLICKHOUSE_LOG_RAW_PAYLOADS", "false")
+    monkeypatch.setenv("CLICKHOUSE_CONNECT_TIMEOUT_SECONDS", "7.5")
+    monkeypatch.setenv("CLICKHOUSE_READ_TIMEOUT_SECONDS", "21")
+    monkeypatch.setenv("CLICKHOUSE_INIT_MAX_RETRIES", "4")
+    monkeypatch.setenv("CLICKHOUSE_INIT_RETRY_BACKOFF_SECONDS", "0.25")
 
     settings = get_settings()
 
@@ -53,6 +65,10 @@ def test_clickhouse_settings_accept_cloud_connection_values(monkeypatch: pytest.
     assert settings.clickhouse_password == "cloud_password"
     assert settings.clickhouse_strict is True
     assert settings.clickhouse_log_raw_payloads is False
+    assert settings.clickhouse_connect_timeout_seconds == 7.5
+    assert settings.clickhouse_read_timeout_seconds == 21.0
+    assert settings.clickhouse_init_max_retries == 4
+    assert settings.clickhouse_init_retry_backoff_seconds == 0.25
 
 
 def test_observability_redacts_auth_headers_and_preserves_payload() -> None:
@@ -116,3 +132,46 @@ def test_observability_enabled_requires_clickhouse_host(monkeypatch: pytest.Monk
 
     with pytest.raises(RuntimeError, match="CLICKHOUSE_HOST is required"):
         service.record_trace_event(event_name="query_started", request_id="req-1")
+
+
+def test_observability_initialize_non_strict_swallows_failures_after_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    from observability import ClickHouseObservability
+
+    monkeypatch.setenv("CLICKHOUSE_CONNECT_TIMEOUT_SECONDS", "0.5")
+    monkeypatch.setenv("CLICKHOUSE_READ_TIMEOUT_SECONDS", "0.5")
+    monkeypatch.setenv("CLICKHOUSE_INIT_MAX_RETRIES", "1")
+    monkeypatch.setenv("CLICKHOUSE_INIT_RETRY_BACKOFF_SECONDS", "0")
+
+    class BrokenClient:
+        def command(self, *_args, **_kwargs):
+            raise RuntimeError("clickhouse down")
+
+    service = ClickHouseObservability(
+        enabled=True,
+        strict=False,
+        client=BrokenClient(),
+    )
+
+    service.initialize()
+
+
+def test_observability_initialize_strict_raises_after_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    from observability import ClickHouseObservability
+
+    monkeypatch.setenv("CLICKHOUSE_CONNECT_TIMEOUT_SECONDS", "0.5")
+    monkeypatch.setenv("CLICKHOUSE_READ_TIMEOUT_SECONDS", "0.5")
+    monkeypatch.setenv("CLICKHOUSE_INIT_MAX_RETRIES", "1")
+    monkeypatch.setenv("CLICKHOUSE_INIT_RETRY_BACKOFF_SECONDS", "0")
+
+    class BrokenClient:
+        def command(self, *_args, **_kwargs):
+            raise RuntimeError("clickhouse down")
+
+    service = ClickHouseObservability(
+        enabled=True,
+        strict=True,
+        client=BrokenClient(),
+    )
+
+    with pytest.raises(RuntimeError, match="clickhouse down"):
+        service.initialize()
