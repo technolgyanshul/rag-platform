@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 import routers.ingest as ingest_router
-from db.supabase import SupabaseRepository
+from db.supabase import DocumentStorageError, SupabaseRepository
 from main import app
 
 
@@ -78,8 +78,65 @@ async def test_ingest_writes_temp_file_and_indexes_qdrant_points(monkeypatch) ->
             files={"file": ("notes.txt", b"hello", "text/plain")},
         )
 
+    documents = SupabaseRepository().list_documents(user_id="00000000-0000-0000-0000-000000000001")
     assert response.status_code == 200
     assert len(FakeQdrantVectorBackend.points) == 1
+    assert len(documents) == 1
+    assert documents[0]["storage_path"] is not None
+    assert documents[0]["storage_path"].endswith("/notes.txt")
+    assert documents[0]["file_size_bytes"] == 5
+
+
+async def test_ingest_persists_document_row_with_storage_path(monkeypatch) -> None:
+    FakeQdrantVectorBackend.points = []
+    FakeQdrantVectorBackend.fail = False
+    monkeypatch.setattr(ingest_router, "QdrantVectorBackend", FakeQdrantVectorBackend)
+    monkeypatch.setattr(
+        ingest_router,
+        "ingest_document",
+        lambda file_path, file_type: {
+            "chunks": [
+                {
+                    "chunk_index": 0,
+                    "content": "hello",
+                    "embedding": [0.1],
+                    "metadata": {"source_type": file_type},
+                }
+            ]
+        },
+    )
+
+    async with _client() as client:
+        response = await client.post(
+            "/ingest",
+            files={"file": ("source.txt", b"hello", "text/plain")},
+        )
+
+    payload = response.json()
+    documents = SupabaseRepository().list_documents(user_id="00000000-0000-0000-0000-000000000001")
+    assert response.status_code == 200
+    assert documents[0]["id"] == payload["document_id"]
+    assert documents[0]["storage_path"] == f"00000000-0000-0000-0000-000000000001/{payload['document_id']}/source.txt"
+
+
+async def test_ingest_returns_503_when_storage_upload_fails(monkeypatch) -> None:
+    monkeypatch.setattr(ingest_router, "QdrantVectorBackend", FakeQdrantVectorBackend)
+
+    def fail_storage_upload(self, storage_path, payload, content_type):
+        raise DocumentStorageError("storage outage")
+
+    monkeypatch.setattr(SupabaseRepository, "upload_document_file", fail_storage_upload)
+
+    async with _client() as client:
+        response = await client.post(
+            "/ingest",
+            files={"file": ("notes.txt", b"hello", "text/plain")},
+        )
+
+    documents = SupabaseRepository().list_documents(user_id="00000000-0000-0000-0000-000000000001")
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Document storage temporarily unavailable"
+    assert documents == []
 
 
 async def test_ingest_records_failed_index_status_on_qdrant_failure(monkeypatch) -> None:

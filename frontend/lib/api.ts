@@ -30,6 +30,21 @@ export type IngestResponse = {
   chunks_created: number;
 };
 
+export type UploadKnowledgeResult = {
+  data: IngestResponse;
+  requestId: string;
+};
+
+export class ApiRequestError extends Error {
+  requestId: string;
+
+  constructor(message: string, requestId: string) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.requestId = requestId;
+  }
+}
+
 export type DocumentRow = {
   id: string;
   filename: string;
@@ -70,23 +85,31 @@ function browserMetadata(): Record<string, unknown> {
   };
 }
 
-export async function uploadKnowledgeFile(file: File): Promise<IngestResponse> {
+export async function uploadKnowledgeFile(file: File): Promise<UploadKnowledgeResult> {
   const formData = new FormData();
   formData.append("file", file);
 
+  const requestId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `upload-${Date.now()}`;
+
   const response = await fetch(`${API_BASE_URL}/ingest`, {
     method: "POST",
-    headers: await buildAuthHeaders(),
+    headers: await buildAuthHeaders({ "x-request-id": requestId }),
     body: formData,
   });
+  const responseRequestId = response.headers.get("x-request-id") || requestId;
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => null);
     const message = errorBody?.detail ?? "Upload failed";
-    throw new Error(message);
+    throw new ApiRequestError(message, responseRequestId);
   }
 
-  return response.json();
+  return {
+    data: await response.json(),
+    requestId: responseRequestId,
+  };
 }
 
 export async function listKnowledgeDocuments(): Promise<DocumentRow[]> {
@@ -150,6 +173,17 @@ export async function listQueryHistory(sessionId: string, limit = 50): Promise<Q
   );
   if (!response.ok) {
     throw new Error("Could not load history");
+  }
+  return response.json();
+}
+
+export async function listRecentQueryHistory(limit = 50): Promise<QueryHistoryItem[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/query/history/recent?limit=${limit}`,
+    { headers: await buildAuthHeaders() },
+  );
+  if (!response.ok) {
+    throw new Error("Could not load recent history");
   }
   return response.json();
 }

@@ -14,6 +14,10 @@ SESSION_ACCESS_ERROR_MESSAGE = "Session is not accessible for this user"
 DOCUMENT_ACCESS_ERROR_MESSAGE = "Document is not accessible for this user"
 
 
+class DocumentStorageError(RuntimeError):
+    pass
+
+
 @dataclass
 class _FallbackStore:
     sessions: list[dict[str, Any]] = field(default_factory=list)
@@ -279,11 +283,14 @@ class SupabaseRepository:
         if not self._client:
             return
 
-        self._client.storage.from_("knowledge-files").upload(
-            path=storage_path,
-            file=payload,
-            file_options={"content-type": content_type, "upsert": "false"},
-        )
+        try:
+            self._client.storage.from_("knowledge-files").upload(
+                path=storage_path,
+                file=payload,
+                file_options={"content-type": content_type, "upsert": "false"},
+            )
+        except Exception as exc:
+            raise DocumentStorageError("Failed to upload source file to storage") from exc
 
     def create_document_download_url(self, user_id: str, document_id: str, expires_in_seconds: int = 300) -> str:
         workspace_id = self._ensure_workspace(user_id)
@@ -460,6 +467,34 @@ class SupabaseRepository:
             return result.data or []
 
         rows = [row for row in _FALLBACK.queries if row.get("session_id") == session_id]
+        rows.sort(key=lambda item: item.get("created_at", ""), reverse=True)
+        return rows[:limit]
+
+    def list_recent_queries(self, user_id: str, limit: int = 50) -> list[dict[str, Any]]:
+        if self._client:
+            sessions = (
+                self._client.table("sessions")
+                .select("id")
+                .eq("user_id", user_id)
+                .limit(500)
+                .execute()
+            )
+            session_ids = [str(row.get("id")) for row in (sessions.data or []) if row.get("id")]
+            if not session_ids:
+                return []
+
+            result = (
+                self._client.table("queries")
+                .select("*")
+                .in_("session_id", session_ids)
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return result.data or []
+
+        owned_session_ids = {row.get("id") for row in _FALLBACK.sessions if row.get("user_id") == user_id}
+        rows = [row for row in _FALLBACK.queries if row.get("session_id") in owned_session_ids]
         rows.sort(key=lambda item: item.get("created_at", ""), reverse=True)
         return rows[:limit]
 

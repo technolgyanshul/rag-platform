@@ -29,6 +29,41 @@ async def test_query_history_returns_saved_rows() -> None:
     assert any(item["id"] == row["id"] for item in payload)
 
 
+async def test_recent_query_history_returns_rows_without_session_id_filter() -> None:
+    repository = SupabaseRepository()
+    user_id = "00000000-0000-0000-0000-000000000001"
+    session_a = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    session_b = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    repository.create_session(user_id=user_id, session_id=session_a)
+    repository.create_session(user_id=user_id, session_id=session_b)
+
+    row_a = repository.save_query(
+        user_id=user_id,
+        session_id=session_a,
+        query_text="Question A",
+        final_answer="Answer A",
+        scorecard=None,
+        response_time_ms=100,
+    )
+    row_b = repository.save_query(
+        user_id=user_id,
+        session_id=session_b,
+        query_text="Question B",
+        final_answer="Answer B",
+        scorecard=None,
+        response_time_ms=120,
+    )
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test") as client:
+        response = await client.get("/query/history/recent", params={"limit": 10})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert any(item["id"] == row_a["id"] for item in payload)
+    assert any(item["id"] == row_b["id"] for item in payload)
+    assert all("session_id" in item for item in payload)
+
+
 async def test_dashboard_metrics_returns_aggregates() -> None:
     repository = SupabaseRepository()
     session_id = "44444444-4444-4444-4444-444444444444"

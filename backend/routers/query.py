@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 from uuid import UUID
 
@@ -45,6 +46,7 @@ class QueryResponse(BaseModel):
     query_id: str | None = None
     query: str
     final_answer: str
+    reasoning: str | None = None
     sources: list[SourceItem]
     retrieval_count: int
     insufficient_context: bool
@@ -62,6 +64,21 @@ class QueryHistoryItem(BaseModel):
     insight_depth: float | None = None
     response_time_ms: int | None = None
     created_at: str
+
+
+_THINK_TAG_PATTERN = re.compile(r"<think>(.*?)</think>", re.IGNORECASE | re.DOTALL)
+
+
+def _split_reasoning_and_answer(raw_text: str) -> tuple[str | None, str]:
+    match = _THINK_TAG_PATTERN.search(raw_text or "")
+    if not match:
+        return None, (raw_text or "").strip()
+
+    reasoning = match.group(1).strip() or None
+    answer = _THINK_TAG_PATTERN.sub("", raw_text).strip()
+    if not answer:
+        answer = "Insufficient context to answer from uploaded documents."
+    return reasoning, answer
 
 
 @router.post(
@@ -220,7 +237,8 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
 
     try:
         generation_start = time.perf_counter()
-        final_answer = generate_answer(query=payload.query, sources=sources)
+        generated_text = generate_answer(query=payload.query, sources=sources)
+        reasoning, final_answer = _split_reasoning_and_answer(generated_text)
         observer.record_trace_event(
             event_name="query_generation_finished",
             request_id=request_id,
@@ -228,7 +246,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             route=QUERY_ROUTE_PREFIX,
             component="generator",
             duration_ms=int((time.perf_counter() - generation_start) * 1000),
-            metadata={"query": payload.query, "sources": sources, "final_answer": final_answer},
+            metadata={"query": payload.query, "sources": sources, "final_answer": final_answer, "reasoning": reasoning},
         )
     except Exception as error:
         logger.exception("query_request_generation_failed", extra={"request_id": request_id})
@@ -306,6 +324,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
         query_id=query_row["id"],
         query=payload.query,
         final_answer=final_answer,
+        reasoning=reasoning,
         sources=sources,
         retrieval_count=len(sources),
         insufficient_context=False,
@@ -371,4 +390,46 @@ async def query_history(
             error=error,
         )
         raise HTTPException(status_code=503, detail="Query history temporarily unavailable") from error
+    return [QueryHistoryItem(**row) for row in rows]
+
+
+@router.get(
+    "/history/recent",
+    response_model=list[QueryHistoryItem],
+    responses={
+        503: {"description": "Recent query history temporarily unavailable"},
+    },
+)
+async def query_history_recent(
+    request: Request,
+    auth_user: AuthUser = Depends(get_current_user),
+    limit: int = Query(get_settings().query_history_limit_default, ge=1, le=get_settings().query_history_limit_max),
+) -> list[QueryHistoryItem]:
+    request_id = getattr(request.state, "request_id", "unknown")
+    observer = observability.get_observability()
+    try:
+        repository = SupabaseRepository()
+        rows = repository.list_recent_queries(user_id=auth_user.user_id, limit=limit)
+        observer.record_trace_event(
+            event_name="query_history_recent_loaded",
+            request_id=request_id,
+            user_id=auth_user.user_id,
+            route=f"{QUERY_ROUTE_PREFIX}/history/recent",
+            component="query_router",
+            metadata={"limit": limit, "row_count": len(rows)},
+        )
+    except Exception as error:
+        logger.exception("query_history_recent_request_failed", extra={"request_id": request_id})
+        observer.record_trace_event(
+            event_name="query_history_recent_request_failed",
+            request_id=request_id,
+            user_id=auth_user.user_id,
+            route=f"{QUERY_ROUTE_PREFIX}/history/recent",
+            component="query_router",
+            level="ERROR",
+            status="failed",
+            metadata={"limit": limit},
+            error=error,
+        )
+        raise HTTPException(status_code=503, detail="Recent query history temporarily unavailable") from error
     return [QueryHistoryItem(**row) for row in rows]

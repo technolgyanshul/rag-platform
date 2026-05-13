@@ -2,10 +2,10 @@
 
 import { FormEvent, useState } from "react";
 
-import { logUiEvent, uploadKnowledgeFile } from "../../lib/api";
+import { ApiRequestError, logUiEvent, uploadKnowledgeFile } from "../../lib/api";
 
 type UploadPanelProps = {
-  onUploaded: () => void;
+  onUploaded: () => Promise<void> | void;
 };
 
 export function UploadPanel({ onUploaded }: UploadPanelProps) {
@@ -30,26 +30,32 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
       payload: { name: file.name, size: file.size, type: file.type },
     }).catch(() => undefined);
     try {
-      const response = await uploadKnowledgeFile(file);
+      const result = await uploadKnowledgeFile(file);
       await logUiEvent({
         event_name: "upload_success",
         page: "/knowledge",
         component: "UploadPanel",
         action: "upload_complete",
-        payload: { file: { name: file.name, size: file.size, type: file.type }, response },
+        payload: { file: { name: file.name, size: file.size, type: file.type }, response: result.data, request_id: result.requestId },
       }).catch(() => undefined);
-      setMessage(`Uploaded ${response.filename} with ${response.chunks_created} indexed chunks.`);
+      setMessage(`Uploaded ${result.data.filename} with ${result.data.chunks_created} indexed chunks. Request ID: ${result.requestId}`);
       setFile(null);
-      onUploaded();
+      await Promise.resolve(onUploaded());
+      setMessage("");
     } catch (error) {
+      const requestId = error instanceof ApiRequestError ? error.requestId : "unknown";
       await logUiEvent({
         event_name: "upload_failure",
         page: "/knowledge",
         component: "UploadPanel",
         action: "upload_error",
-        payload: { file: { name: file.name, size: file.size, type: file.type }, error: error instanceof Error ? error.message : String(error) },
+        payload: {
+          file: { name: file.name, size: file.size, type: file.type },
+          error: error instanceof Error ? error.message : String(error),
+          request_id: requestId,
+        },
       }).catch(() => undefined);
-      setMessage(error instanceof Error ? error.message : "Upload failed");
+      setMessage(`${error instanceof Error ? error.message : "Upload failed"} (Request ID: ${requestId})`);
     } finally {
       setLoading(false);
     }

@@ -43,6 +43,21 @@ def test_embed_query_returns_normalized_vector(monkeypatch: pytest.MonkeyPatch) 
     assert pipeline.embed_query("what is rag?") == [1.0, 2.5, 3.0]
 
 
+def test_embed_query_falls_back_to_sequence_input_when_string_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeEmbedAnything:
+        def embed_query(self, query, *, embedder):
+            if isinstance(query, str):
+                raise TypeError("Can't extract `str` to `Vec`")
+            return [{"embedding": [0.4, 0.5, 0.6]}]
+
+    monkeypatch.setattr(pipeline, "_import_embedanything", lambda: FakeEmbedAnything())
+    monkeypatch.setattr(pipeline, "_get_embedding_model", lambda _module: object())
+
+    embedding = pipeline._embed_query_with_embedanything("hello")
+
+    assert embedding == {"embedding": [0.4, 0.5, 0.6]}
+
+
 def test_missing_embedanything_dependency_fails_clearly(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     file_path = tmp_path / "source.txt"
     file_path.write_text("content", encoding="utf-8")

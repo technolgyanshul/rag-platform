@@ -4,22 +4,50 @@ import { FormEvent, useEffect, useState } from "react";
 
 import { ProtectedPage } from "../../components/auth/ProtectedPage";
 import { AppShell } from "../../components/layout/AppShell";
-import { listQueryHistory, logUiEvent } from "../../lib/api";
+import { listQueryHistory, listRecentQueryHistory, logUiEvent } from "../../lib/api";
 import { QueryHistoryItem } from "../../lib/types";
 
 export default function HistoryPage() {
   const [sessionId, setSessionId] = useState("");
   const [rows, setRows] = useState<QueryHistoryItem[]>([]);
-  const [message, setMessage] = useState("Enter a session ID to load history.");
+  const [message, setMessage] = useState("Loading recent query history...");
+  const [mode, setMode] = useState<"recent" | "session">("recent");
 
   useEffect(() => {
     void logUiEvent({ event_name: "page_view", page: "/history", component: "HistoryPage", action: "load" }).catch(() => undefined);
+    void loadRecentHistory();
   }, []);
+
+  const loadRecentHistory = async () => {
+    try {
+      const result = await listRecentQueryHistory();
+      await logUiEvent({
+        event_name: "query_history_recent_success",
+        page: "/history",
+        component: "HistoryPage",
+        action: "load_recent_history",
+        payload: { row_count: result.length, rows: result },
+      }).catch(() => undefined);
+      setRows(result);
+      setMode("recent");
+      setMessage(result.length ? "" : "No recent queries found.");
+    } catch (error) {
+      await logUiEvent({
+        event_name: "query_history_recent_failure",
+        page: "/history",
+        component: "HistoryPage",
+        action: "load_recent_history",
+        payload: { error: error instanceof Error ? error.message : String(error) },
+      }).catch(() => undefined);
+      setRows([]);
+      setMessage(error instanceof Error ? error.message : "Could not load recent history.");
+    }
+  };
 
   const handleLoad = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!sessionId.trim()) {
-      setMessage("Please provide a session ID.");
+      void loadRecentHistory();
       return;
     }
     try {
@@ -32,6 +60,7 @@ export default function HistoryPage() {
         payload: { session_id: sessionId.trim(), row_count: result.length, rows: result },
       }).catch(() => undefined);
       setRows(result);
+      setMode("session");
       setMessage(result.length ? "" : "No history found for this session.");
     } catch (error) {
       await logUiEvent({
@@ -57,17 +86,19 @@ export default function HistoryPage() {
                 id="history-session-id"
                 value={sessionId}
                 onChange={(event) => setSessionId(event.target.value)}
-                placeholder="Session UUID"
+                placeholder="Session UUID (optional)"
               />
             </label>
             <div style={{ display: "grid", alignItems: "end" }}>
-              <button type="submit">Load History</button>
+              <button type="submit">{sessionId.trim() ? "Load Session History" : "Load Recent History"}</button>
             </div>
           </form>
         </div>
 
         <div className="card">
-          <h3 style={{ marginBottom: 12 }}>Past Queries</h3>
+          <h3 style={{ marginBottom: 12 }}>
+            {mode === "recent" ? "Past Queries (Recent Across Sessions)" : "Past Queries (Session Filtered)"}
+          </h3>
           {!rows.length ? (
             <p className="status-message">{message}</p>
           ) : (
@@ -75,6 +106,7 @@ export default function HistoryPage() {
               <table className="data-table">
                 <thead>
                   <tr>
+                    <th>Session ID</th>
                     <th>Query</th>
                     <th>Answer Preview</th>
                     <th>Score</th>
@@ -85,6 +117,7 @@ export default function HistoryPage() {
                 <tbody>
                   {rows.map((row: QueryHistoryItem) => (
                     <tr key={row.id}>
+                      <td>{row.session_id}</td>
                       <td>{row.query_text}</td>
                       <td>{row.final_answer.slice(0, 140)}...</td>
                       <td>{row.overall_score ?? "N/A"}</td>

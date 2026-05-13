@@ -10,6 +10,7 @@ export type QueryResponse = {
   query_id: string | null;
   query: string;
   final_answer: string;
+  reasoning?: string | null;
   sources: Source[];
   retrieval_count: number;
   insufficient_context: boolean;

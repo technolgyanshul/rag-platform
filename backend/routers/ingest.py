@@ -5,6 +5,7 @@ import time
 from collections import OrderedDict
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, UploadFile
 from pydantic import BaseModel
@@ -12,7 +13,7 @@ from pydantic import BaseModel
 import observability
 from core.auth import AuthUser, get_current_user
 from core.config import get_settings
-from db.supabase import SupabaseRepository
+from db.supabase import DocumentStorageError, SupabaseRepository
 from rag.ingest import ingest_document
 from rag.qdrant_backend import QdrantVectorBackend
 from rag.vector_backend import VectorPoint
@@ -47,6 +48,7 @@ class DocumentListItem(BaseModel):
     index_status: str = "legacy_unindexed"
     indexed_at: str | None = None
     index_error: str | None = None
+    storage_path: str | None = None
 
 
 class DocumentDownloadResponse(BaseModel):
@@ -168,16 +170,53 @@ async def ingest(
         metadata={"filename": file.filename, "file_type": extension, "size_bytes": len(payload), "temp_path": temp_path},
     )
 
+    document_id = str(uuid4())
+    source_filename = file.filename or "untitled"
+    storage_path = f"{auth_user.user_id}/{document_id}/{Path(source_filename).name}"
+    content_type = file.content_type or "application/octet-stream"
+
+    try:
+        repository.upload_document_file(
+            storage_path=storage_path,
+            payload=payload,
+            content_type=content_type,
+        )
+        observer.record_trace_event(
+            event_name="ingest_source_file_uploaded",
+            request_id=request_id,
+            user_id=auth_user.user_id,
+            route=INGEST_ROUTE_PREFIX,
+            component="supabase_storage",
+            metadata={"storage_path": storage_path, "content_type": content_type, "size_bytes": len(payload)},
+        )
+    except DocumentStorageError as error:
+        observer.record_trace_event(
+            event_name="ingest_storage_upload_failed",
+            request_id=request_id,
+            user_id=auth_user.user_id,
+            route=INGEST_ROUTE_PREFIX,
+            component="supabase_storage",
+            level="ERROR",
+            status="failed",
+            metadata={"filename": file.filename, "storage_path": storage_path},
+            error=error,
+        )
+        raise HTTPException(status_code=503, detail="Document storage temporarily unavailable") from error
+
     try:
         document_row = repository.insert_document(
             user_id=auth_user.user_id,
-            filename=file.filename or "untitled",
+            filename=source_filename,
             file_type=extension,
             chunk_count=0,
+            storage_path=storage_path,
+            content_type=content_type,
+            file_size_bytes=len(payload),
             embedding_model_version=settings.embedanything_model,
             index_version=settings.index_version,
             index_backend="qdrant_embedanything",
             index_status="indexing",
+            document_id=document_id,
         )
         observer.record_trace_event(
             event_name="ingest_document_row_created",

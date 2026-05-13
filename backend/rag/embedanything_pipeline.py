@@ -71,7 +71,12 @@ def _embed_query_with_embedanything(query: str) -> Any:
     model = _get_embedding_model(embed_anything)
 
     if callable(getattr(embed_anything, "embed_query", None)):
-        return embed_anything.embed_query(query, embedder=model)
+        try:
+            return embed_anything.embed_query(query, embedder=model)
+        except TypeError:
+            # Some embed-anything builds expect a Vec/sequence of queries.
+            # Fall back to single-item list and normalize to one embedding.
+            return _first_embedding_result(embed_anything.embed_query([query], embedder=model))
     if callable(getattr(model, "embed_query", None)):
         return model.embed_query(query)
     if callable(getattr(model, "embed_text", None)):

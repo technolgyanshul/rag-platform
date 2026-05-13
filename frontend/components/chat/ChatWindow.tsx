@@ -21,6 +21,12 @@ export function ChatWindow({ queryState }: ChatWindowProps) {
       <p>
         <strong>Query:</strong> {response.query}
       </p>
+      {response.reasoning ? (
+        <div>
+          <strong>Reasoning:</strong>
+          <p>{response.reasoning}</p>
+        </div>
+      ) : null}
       <p>
         <strong>Final Answer:</strong> {response.final_answer}
       </p>

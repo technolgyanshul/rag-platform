@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getDocumentDownloadUrl, listKnowledgeDocuments, logUiEvent, uploadKnowledgeFile } from "./api";
+import { ApiRequestError, getDocumentDownloadUrl, listKnowledgeDocuments, listRecentQueryHistory, logUiEvent, uploadKnowledgeFile } from "./api";
 
 vi.mock("@/utils/supabase/client", () => ({
   createClient: vi.fn(() => ({
@@ -33,24 +33,34 @@ describe("uploadKnowledgeFile", () => {
       "fetch",
       vi.fn().mockResolvedValue({
         ok: true,
+        headers: {
+          get: vi.fn().mockReturnValue("req-123"),
+        },
         json: vi.fn().mockResolvedValue(mockResponse),
       }),
     );
 
     const result = await uploadKnowledgeFile(new File(["hello"], "sample.txt"));
-    expect(result).toEqual(mockResponse);
+    expect(result).toEqual({ data: mockResponse, requestId: "req-123" });
   });
 
-  it("throws backend detail when upload fails", async () => {
+  it("throws backend detail with request id when upload fails", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
         ok: false,
+        headers: {
+          get: vi.fn().mockReturnValue("req-456"),
+        },
         json: vi.fn().mockResolvedValue({ detail: "Upload blocked" }),
       }),
     );
 
-    await expect(uploadKnowledgeFile(new File(["hello"], "sample.txt"))).rejects.toThrow("Upload blocked");
+    await expect(uploadKnowledgeFile(new File(["hello"], "sample.txt"))).rejects.toBeInstanceOf(ApiRequestError);
+    await expect(uploadKnowledgeFile(new File(["hello"], "sample.txt"))).rejects.toMatchObject({
+      message: "Upload blocked",
+      requestId: "req-456",
+    });
   });
 });
 
@@ -64,6 +74,19 @@ describe("listKnowledgeDocuments", () => {
     );
 
     await expect(listKnowledgeDocuments()).rejects.toThrow("Could not load documents");
+  });
+});
+
+describe("listRecentQueryHistory", () => {
+  it("throws when recent history request fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+      }),
+    );
+
+    await expect(listRecentQueryHistory()).rejects.toThrow("Could not load recent history");
   });
 });
 
