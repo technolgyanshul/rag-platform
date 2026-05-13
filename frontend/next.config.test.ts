@@ -9,7 +9,7 @@ describe("nextConfig", () => {
     expect(rewrites).toEqual([
       {
         source: "/api/:path*",
-        destination: "http://backend:8000/:path*",
+        destination: "https://backend:8000/:path*",
       },
     ]);
   });
