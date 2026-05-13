@@ -1,4 +1,7 @@
-from db.supabase import SupabaseRepository
+import ast
+import inspect
+
+from db.supabase import SupabaseRepository, _cosine_similarity
 
 
 def test_save_query_in_memory() -> None:
@@ -17,3 +20,20 @@ def test_save_query_in_memory() -> None:
 
     assert query_row["id"]
     assert query_row["overall_score"] is None
+
+
+def test_cosine_similarity_avoids_float_equality_checks() -> None:
+    tree = ast.parse(inspect.getsource(_cosine_similarity))
+
+    float_equality_checks = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Compare)
+        and any(isinstance(operator, ast.Eq | ast.NotEq) for operator in node.ops)
+        and any(
+            isinstance(value, ast.Constant) and isinstance(value.value, float)
+            for value in [node.left, *node.comparators]
+        )
+    ]
+
+    assert float_equality_checks == []

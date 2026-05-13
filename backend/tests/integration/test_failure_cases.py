@@ -120,6 +120,7 @@ async def test_ingest_openapi_documents_error_responses() -> None:
 
     assert {"400", "403", "500", "503"}.issubset(schema["paths"]["/ingest"]["post"]["responses"])
     assert {"403", "503"}.issubset(schema["paths"]["/ingest/documents"]["get"]["responses"])
+    assert {"403", "503"}.issubset(schema["paths"]["/sessions"]["post"]["responses"])
 
 
 async def test_query_history_requires_non_empty_session_id() -> None:
