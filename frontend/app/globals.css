@@ -1,3 +1,5 @@
+@import url("./material-symbols.css");
+
 :root {
   --bg: #f3f6fb;
   --surface: #ffffff;
@@ -103,6 +105,32 @@ select:focus {
 .status-message {
   color: var(--muted);
   font-size: 0.92rem;
+}
+
+.answer-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.answer-panel h4 {
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.answer-panel p {
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.answer-panel--reasoning {
+  background: #f9fbff;
+  border-left: 4px solid #7aa2ef;
+}
+
+.answer-panel--final {
+  border-left: 4px solid var(--accent);
 }
 
 .auth-page {

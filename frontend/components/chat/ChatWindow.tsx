@@ -22,14 +22,15 @@ export function ChatWindow({ queryState }: ChatWindowProps) {
         <strong>Query:</strong> {response.query}
       </p>
       {response.reasoning ? (
-        <div>
-          <strong>Reasoning:</strong>
+        <div className="card answer-panel answer-panel--reasoning">
+          <h4>Reasoning</h4>
           <p>{response.reasoning}</p>
         </div>
       ) : null}
-      <p>
-        <strong>Final Answer:</strong> {response.final_answer}
-      </p>
+      <div className="card answer-panel answer-panel--final">
+        <h4>Final Answer</h4>
+        <p>{response.final_answer}</p>
+      </div>
       <p className="status-message">
         Retrieval count: {response.retrieval_count} | Insufficient context: {response.insufficient_context ? "yes" : "no"}
       </p>
