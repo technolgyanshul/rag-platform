@@ -244,6 +244,11 @@ Add backend routes for:
 * User cannot access another user’s team.
 * Delete team cascades agents safely.
 
+Follow-up hardening:
+
+1. Add a live-Supabase integration check for cascade behavior.
+2. Add API contract assertions for delete response semantics if strict status code requirements are needed.
+
 ---
 
 # Phase 5 — Add Team + Agent UI
@@ -364,9 +369,11 @@ class OllamaClient:
 
 ---
 
-# Phase 7 — Implement Sequential Multi-Agent Orchestration
+# Phase 7 - Implement Multi-Architecture Orchestration
 
-Do not implement debate or hierarchical yet. Sequential is enough for MVP demo.
+Runtime scope: sequential, debate, and hierarchical orchestration are implemented together.
+
+Detailed implementation plan: `Implement Multi-Architecture Orchestration.md`.
 
 ## Flow
 

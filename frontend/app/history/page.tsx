@@ -13,11 +13,6 @@ export default function HistoryPage() {
   const [message, setMessage] = useState("Loading recent query history...");
   const [mode, setMode] = useState<"recent" | "session">("recent");
 
-  useEffect(() => {
-    void logUiEvent({ event_name: "page_view", page: "/history", component: "HistoryPage", action: "load" }).catch(() => undefined);
-    void loadRecentHistory();
-  }, []);
-
   const loadRecentHistory = async () => {
     try {
       const result = await listRecentQueryHistory();
@@ -43,6 +38,13 @@ export default function HistoryPage() {
       setMessage(error instanceof Error ? error.message : "Could not load recent history.");
     }
   };
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    void logUiEvent({ event_name: "page_view", page: "/history", component: "HistoryPage", action: "load" }).catch(() => undefined);
+    void loadRecentHistory();
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleLoad = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

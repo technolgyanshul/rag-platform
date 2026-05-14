@@ -24,13 +24,6 @@ export default function KnowledgePage() {
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [message, setMessage] = useState("Upload a document to populate the demo knowledge base.");
 
-  useEffect(() => {
-    void logUiEvent({ event_name: "page_view", page: "/knowledge", component: "KnowledgePage", action: "load" }).catch((error: unknown) => {
-      console.error("Failed to log knowledge page view event", error);
-    });
-    void refreshDocuments();
-  }, []);
-
   const refreshDocuments = async () => {
     try {
       const rows = await listKnowledgeDocuments();
@@ -58,6 +51,15 @@ export default function KnowledgePage() {
       setMessage("Could not load uploaded documents.");
     }
   };
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    void logUiEvent({ event_name: "page_view", page: "/knowledge", component: "KnowledgePage", action: "load" }).catch((error: unknown) => {
+      console.error("Failed to log knowledge page view event", error);
+    });
+    void refreshDocuments();
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleDownload = async (documentId: string) => {
     try {
@@ -88,10 +90,10 @@ export default function KnowledgePage() {
 
   return (
     <ProtectedPage>
-        <AppShell
-          title="Knowledge Base Management"
-          subtitle="Upload, inspect, and sync documents used by retrieval"
-          actions={
+      <AppShell
+        title="Knowledge Base Management"
+        subtitle="Upload, inspect, and sync documents used by retrieval"
+        actions={
           <button type="button" onClick={() => void refreshDocuments()}>
             Refresh Documents
           </button>
