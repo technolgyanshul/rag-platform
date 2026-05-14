@@ -12,6 +12,11 @@ def _client() -> httpx.AsyncClient:
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test")
 
 
+class FakeLLMRouter:
+    def chat(self, provider, model_name, messages, metadata=None):
+        return "Answer from source."
+
+
 async def test_query_returns_top_k_sources(monkeypatch) -> None:
     monkeypatch.setattr(
         query_router,
@@ -27,7 +32,7 @@ async def test_query_returns_top_k_sources(monkeypatch) -> None:
             }
         ],
     )
-    monkeypatch.setattr(query_router, "generate_answer", lambda query, sources: "Answer from source.")
+    monkeypatch.setattr(query_router, "LLMRouter", lambda: FakeLLMRouter())
 
     async with _client() as client:
         response = await client.post(
@@ -38,10 +43,12 @@ async def test_query_returns_top_k_sources(monkeypatch) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["query_id"]
+    assert payload["final_answer"] == "Answer from source."
     assert payload["insufficient_context"] is False
     assert payload["retrieval_count"] == 1
     assert payload["sources"][0]["filename"] == "report.txt"
     assert "chunk_index" in payload["sources"][0]
+    assert payload["traces"]
 
 
 async def test_query_returns_insufficient_context_when_no_hits(monkeypatch) -> None:
