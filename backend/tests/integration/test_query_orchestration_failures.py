@@ -40,7 +40,7 @@ async def test_query_model_failure_persists_failed_trace(rule: str, monkeypatch:
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test") as client:
         response = await client.post(
             "/query",
-            json={"query": "What fails?", "session_id": session_id, "top_k": 1},
+            json={"query": "What fails?", "session_id": session_id, "team_id": team_id, "top_k": 1},
         )
 
     assert response.status_code == 503

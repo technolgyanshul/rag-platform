@@ -2,6 +2,7 @@ import httpx
 import pytest
 
 import routers.query as query_router
+from db.supabase import SupabaseRepository
 from main import app
 
 
@@ -15,6 +16,16 @@ def _client() -> httpx.AsyncClient:
 class FakeLLMRouter:
     def chat(self, provider, model_name, messages, metadata=None):
         return "Answer from source."
+
+
+def _team_id() -> str:
+    repository = SupabaseRepository()
+    team = repository.create_team(
+        user_id="00000000-0000-0000-0000-000000000001",
+        name="Query Test Team",
+        domain=None,
+    )
+    return str(team["id"])
 
 
 async def test_query_returns_top_k_sources(monkeypatch) -> None:
@@ -37,7 +48,12 @@ async def test_query_returns_top_k_sources(monkeypatch) -> None:
     async with _client() as client:
         response = await client.post(
             "/query",
-            json={"query": "alpha", "session_id": "66666666-6666-6666-6666-666666666666", "top_k": 1},
+            json={
+                "query": "alpha",
+                "session_id": "66666666-6666-6666-6666-666666666666",
+                "team_id": _team_id(),
+                "top_k": 1,
+            },
         )
 
     assert response.status_code == 200
@@ -60,6 +76,7 @@ async def test_query_returns_insufficient_context_when_no_hits(monkeypatch) -> N
             json={
                 "query": "unknown",
                 "session_id": "88888888-8888-8888-8888-888888888888",
+                "team_id": _team_id(),
                 "top_k": 3,
             },
         )

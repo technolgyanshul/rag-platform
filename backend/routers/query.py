@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 class QueryRequest(BaseModel):
     query: str = Field(min_length=1, max_length=get_settings().max_query_length)
     session_id: UUID
+    team_id: UUID
     top_k: int | None = Field(default=None, ge=1, le=20)
 
 
@@ -175,6 +176,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
         extra={
             "request_id": request_id,
             "session_id": str(payload.session_id),
+            "team_id": str(payload.team_id),
             "user_id": auth_user.user_id,
             "top_k": payload.top_k,
         },
@@ -187,6 +189,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
         component="query_router",
         metadata={
             "session_id": str(payload.session_id),
+            "team_id": str(payload.team_id),
             "query": payload.query,
             "top_k": payload.top_k,
         },
@@ -201,13 +204,18 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             user_id=auth_user.user_id,
             route=QUERY_ROUTE_PREFIX,
             component="supabase",
-            metadata={"session_id": str(payload.session_id)},
+            metadata={"session_id": str(payload.session_id), "team_id": str(payload.team_id)},
         )
+        requested_team_id = str(payload.team_id)
+        team = repository.get_team(user_id=auth_user.user_id, team_id=requested_team_id)
+        if team is None:
+            raise HTTPException(status_code=403, detail="Selected team is not accessible for this user")
         session = repository.get_session(user_id=auth_user.user_id, session_id=str(payload.session_id))
         if session is None:
             session = repository.create_session(
                 user_id=auth_user.user_id,
                 session_id=str(payload.session_id),
+                team_id=requested_team_id,
                 title="Chat session",
             )
             observer.record_trace_event(
@@ -216,15 +224,14 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
                 user_id=auth_user.user_id,
                 route=QUERY_ROUTE_PREFIX,
                 component="supabase",
-                metadata={"session_id": str(payload.session_id)},
+                metadata={"session_id": str(payload.session_id), "team_id": requested_team_id},
             )
         session_team_id = str(session.get("team_id", "")).strip()
         if not session_team_id:
             raise HTTPException(status_code=503, detail="Session team is missing")
-        team = repository.get_team(user_id=auth_user.user_id, team_id=session_team_id)
-        if team is None:
-            raise HTTPException(status_code=403, detail="Session team is not accessible for this user")
-        agents = repository.list_agents(user_id=auth_user.user_id, team_id=session_team_id)
+        if session_team_id != requested_team_id:
+            raise HTTPException(status_code=409, detail="Session belongs to a different team than the requested team")
+        agents = repository.list_agents(user_id=auth_user.user_id, team_id=requested_team_id)
         if not agents:
             raise HTTPException(status_code=409, detail="Team must have at least one agent before chat")
 
@@ -267,7 +274,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             component="query_router",
             level="WARNING",
             status="failed",
-            metadata={"session_id": str(payload.session_id)},
+            metadata={"session_id": str(payload.session_id), "team_id": str(payload.team_id)},
             error=error,
         )
         raise HTTPException(status_code=403, detail=str(error)) from error
@@ -283,7 +290,7 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             component="query_router",
             level="ERROR",
             status="failed",
-            metadata={"session_id": str(payload.session_id), "query": payload.query},
+            metadata={"session_id": str(payload.session_id), "team_id": str(payload.team_id), "query": payload.query},
             error=error,
         )
         raise HTTPException(status_code=503, detail="Retrieval temporarily unavailable") from error

@@ -191,11 +191,16 @@ async def test_query_rejects_session_from_other_user() -> None:
     repository = SupabaseRepository()
     session_id = "30000000-0000-0000-0000-000000000003"
     repository.create_session(user_id="99999999-0000-0000-0000-000000000999", session_id=session_id)
+    team = repository.create_team(
+        user_id="00000000-0000-0000-0000-000000000001",
+        name="Current User Team",
+        domain=None,
+    )
 
     async with _client() as client:
         response = await client.post(
             "/query",
-            json={"query": "mismatch", "session_id": session_id, "top_k": 1},
+            json={"query": "mismatch", "session_id": session_id, "team_id": str(team["id"]), "top_k": 1},
         )
 
     assert response.status_code == 403

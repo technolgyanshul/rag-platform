@@ -32,6 +32,7 @@ class FakeLLMRouter:
                 "provider": provider,
                 "model_name": model_name,
                 "agent_name": metadata.get("agent_name"),
+                "team_id": metadata.get("team_id"),
             }
         )
         return f"{metadata.get('agent_name', 'Agent')} output"
@@ -101,7 +102,7 @@ async def test_query_runs_rule_aware_orchestration_and_returns_traces(rule: str,
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test") as client:
         response = await client.post(
             "/query",
-            json={"query": "What does the policy say?", "session_id": session_id, "top_k": 1},
+            json={"query": "What does the policy say?", "session_id": session_id, "team_id": team_id, "top_k": 1},
         )
 
     assert response.status_code == 200
@@ -118,3 +119,4 @@ async def test_query_runs_rule_aware_orchestration_and_returns_traces(rule: str,
     persisted = repository.list_agent_traces(user_id=USER_ID, session_id=session_id, query_id=payload["query_id"])
     assert len(persisted) == len(payload["traces"])
     assert [call["model_name"] for call in fake_llm.calls] == ["llama-3.1-8b-instant"] * len(fake_llm.calls)
+    assert [call["team_id"] for call in fake_llm.calls] == [team_id] * len(fake_llm.calls)

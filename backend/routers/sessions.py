@@ -1,4 +1,5 @@
 import logging
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -14,10 +15,12 @@ logger = logging.getLogger(__name__)
 
 class CreateSessionRequest(BaseModel):
     title: str | None = Field(default=None, max_length=200)
+    team_id: UUID | None = None
 
 
 class SessionResponse(BaseModel):
     id: str
+    team_id: str
     title: str | None = None
     created_at: str
 
@@ -42,6 +45,7 @@ async def create_session(
         row = repository.create_session(
             user_id=auth_user.user_id,
             title=payload.title,
+            team_id=str(payload.team_id) if payload.team_id else None,
         )
         observer.record_trace_event(
             event_name="session_created",
@@ -49,7 +53,7 @@ async def create_session(
             user_id=auth_user.user_id,
             route="/sessions",
             component="sessions_router",
-            metadata={"session": row, "title": payload.title},
+            metadata={"session": row, "team_id": str(payload.team_id) if payload.team_id else None, "title": payload.title},
         )
     except PermissionError as error:
         observer.record_trace_event(
@@ -76,13 +80,14 @@ async def create_session(
             component="sessions_router",
             level="ERROR",
             status="failed",
-            metadata={"title": payload.title},
+            metadata={"team_id": str(payload.team_id) if payload.team_id else None, "title": payload.title},
             error=error,
         )
         raise HTTPException(status_code=503, detail="Session service temporarily unavailable") from error
 
     return SessionResponse(
         id=str(row.get("id", "")),
+        team_id=str(row.get("team_id", "")),
         title=row.get("title"),
         created_at=str(row.get("created_at", "")),
     )
