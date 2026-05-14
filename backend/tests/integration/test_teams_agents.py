@@ -4,6 +4,7 @@ import pytest
 from core.auth import AuthUser, get_current_user
 from db.supabase import _FALLBACK
 from main import app
+import routers.teams as teams_router
 
 
 pytestmark = pytest.mark.anyio
@@ -218,3 +219,35 @@ async def test_delete_team_cascades_agents_in_fallback_store() -> None:
     assert delete_response.status_code == 200
     assert len([a for a in _FALLBACK.agents if a.get("team_id") == team_id]) == 0
     assert list_agents_after.status_code == 404
+
+
+async def test_lmstudio_probe_endpoints_return_health_and_models(monkeypatch) -> None:
+    class FakeLMStudioClient:
+        def health(self, base_url: str, passcode: str | None = None, timeout_seconds: float = 10.0) -> dict:
+            assert base_url == "http://localhost:1234"
+            assert passcode == "secret"
+            assert timeout_seconds == 7
+            return {"ok": True, "models_count": 2}
+
+        def list_models(self, base_url: str, passcode: str | None = None, timeout_seconds: float = 10.0) -> list[str]:
+            assert base_url == "http://localhost:1234"
+            assert passcode == "secret"
+            assert timeout_seconds == 7
+            return ["phi-3-mini", "qwen3-8b"]
+
+    monkeypatch.setattr(teams_router, "LMStudioClient", lambda: FakeLMStudioClient())
+
+    async with _client() as client:
+        health_response = await client.post(
+            "/teams/lmstudio/health",
+            json={"base_url": "http://localhost:1234", "passcode": "secret", "timeout_seconds": 7},
+        )
+        models_response = await client.post(
+            "/teams/lmstudio/models",
+            json={"base_url": "http://localhost:1234", "passcode": "secret", "timeout_seconds": 7},
+        )
+
+    assert health_response.status_code == 200
+    assert health_response.json() == {"ok": True, "models_count": 2}
+    assert models_response.status_code == 200
+    assert models_response.json() == {"models": ["phi-3-mini", "qwen3-8b"]}

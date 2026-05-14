@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-import requests
-
 from llms.groq_client import GroqClient
+from llms.lmstudio_client import LMStudioClient, LMStudioError
 from llms.sarvam_client import SarvamClient
 
 
@@ -36,7 +35,8 @@ class LLMRouter:
             if provider_name == "sarvam":
                 client = self._provider_clients.get("sarvam") or SarvamClient()
                 return client.chat(messages=messages, model=model_name, metadata=metadata)
-            return self._chat_lmstudio(model_name=model_name, messages=messages, metadata=metadata)
+            client = self._provider_clients.get("lmstudio") or LMStudioClient()
+            return self._chat_lmstudio(client=client, model_name=model_name, messages=messages, metadata=metadata)
         except Exception as exc:
             if isinstance(exc, LLMRouterError):
                 raise
@@ -44,29 +44,23 @@ class LLMRouter:
 
     def _chat_lmstudio(
         self,
+        client: LMStudioClient,
         model_name: str,
         messages: list[dict[str, str]],
         metadata: dict[str, Any],
     ) -> str:
         base_url = str(metadata.get("provider_base_url") or "").strip().rstrip("/")
         if not base_url:
-            raise ValueError("metadata.provider_base_url is required for lmstudio")
-
-        headers = {"Content-Type": "application/json"}
+            raise LMStudioError(category="invalid_config", message="metadata.provider_base_url is required for lmstudio")
         passcode = metadata.get("provider_passcode")
-        if passcode:
-            headers["Authorization"] = f"Bearer {passcode}"
-
-        timeout = metadata.get("timeout_seconds", metadata.get("timeout", 30))
-        response = requests.post(
-            f"{base_url}/v1/chat/completions",
-            headers=headers,
-            json={"model": model_name, "messages": messages, "temperature": 0.2},
-            timeout=timeout,
+        timeout = float(metadata.get("timeout_seconds", metadata.get("timeout", 30)))
+        return client.chat(
+            model_name=model_name,
+            messages=messages,
+            base_url=base_url,
+            passcode=str(passcode) if isinstance(passcode, str) and passcode else None,
+            timeout_seconds=timeout,
         )
-        response.raise_for_status()
-        payload = response.json()
-        return payload["choices"][0]["message"]["content"] or ""
 
     def _failure_message(
         self,
@@ -81,4 +75,9 @@ class LLMRouter:
         if metadata.get("agent_id"):
             agent_bits.append(f"id={metadata['agent_id']}")
         agent_context = f" agent({', '.join(agent_bits)})" if agent_bits else ""
+        if isinstance(error, LMStudioError):
+            return (
+                f"LLM provider failure for{agent_context} provider={provider} model={model_name} "
+                f"category={error.category}: {error.message}"
+            )
         return f"LLM provider failure for{agent_context} provider={provider} model={model_name}: {error}"

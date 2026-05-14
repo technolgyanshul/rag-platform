@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from core.auth import AuthUser, get_current_user
 from core.model_registry import ModelValidationError, default_model_selection, model_catalog, validate_model_selection
 from db.supabase import SupabaseRepository, default_team_agents
+from llms.lmstudio_client import LMStudioClient, LMStudioError
 
 
 router = APIRouter(prefix="/teams", tags=["teams"])
@@ -18,6 +19,21 @@ class ModelsResponse(BaseModel):
     groq: list[str]
     sarvam: list[str]
     lmstudio: list[str]
+
+
+class LMStudioProbeRequest(BaseModel):
+    base_url: str = Field(min_length=1, max_length=500)
+    passcode: str | None = Field(default=None, max_length=500)
+    timeout_seconds: float = Field(default=10, ge=1, le=120)
+
+
+class LMStudioHealthResponse(BaseModel):
+    ok: bool
+    models_count: int
+
+
+class LMStudioModelsResponse(BaseModel):
+    models: list[str]
 
 
 class AgentDefaultsResponse(BaseModel):
@@ -137,6 +153,47 @@ async def list_models(_auth_user: AuthUser = Depends(get_current_user)) -> Model
         return ModelsResponse(**catalog)
     except Exception as error:
         raise HTTPException(status_code=503, detail="Model catalog temporarily unavailable") from error
+
+
+def _lmstudio_http_error(error: LMStudioError) -> HTTPException:
+    details = {"category": error.category, "message": error.message}
+    if error.category in {"invalid_config", "malformed_response"}:
+        return HTTPException(status_code=400, detail=details)
+    if error.category == "auth_rejection":
+        return HTTPException(status_code=401, detail=details)
+    if error.category == "unreachable_server":
+        return HTTPException(status_code=503, detail=details)
+    if error.category == "timeout":
+        return HTTPException(status_code=504, detail=details)
+    if error.category == "model_missing":
+        return HTTPException(status_code=404, detail=details)
+    return HTTPException(status_code=502, detail=details)
+
+
+@router.post("/lmstudio/health", response_model=LMStudioHealthResponse)
+async def lmstudio_health_probe(payload: LMStudioProbeRequest, _auth_user: AuthUser = Depends(get_current_user)) -> LMStudioHealthResponse:
+    try:
+        result = LMStudioClient().health(
+            base_url=payload.base_url,
+            passcode=payload.passcode,
+            timeout_seconds=payload.timeout_seconds,
+        )
+    except LMStudioError as error:
+        raise _lmstudio_http_error(error) from error
+    return LMStudioHealthResponse(**result)
+
+
+@router.post("/lmstudio/models", response_model=LMStudioModelsResponse)
+async def lmstudio_model_probe(payload: LMStudioProbeRequest, _auth_user: AuthUser = Depends(get_current_user)) -> LMStudioModelsResponse:
+    try:
+        models = LMStudioClient().list_models(
+            base_url=payload.base_url,
+            passcode=payload.passcode,
+            timeout_seconds=payload.timeout_seconds,
+        )
+    except LMStudioError as error:
+        raise _lmstudio_http_error(error) from error
+    return LMStudioModelsResponse(models=models)
 
 
 @router.get(

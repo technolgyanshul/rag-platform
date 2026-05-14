@@ -309,6 +309,11 @@ export type AgentCreatePayload = {
 };
 
 export type AgentPatchPayload = Partial<AgentCreatePayload>;
+export type LMStudioProbePayload = {
+  base_url: string;
+  passcode?: string | null;
+  timeout_seconds?: number;
+};
 
 export async function listTeams(): Promise<Team[]> {
   const response = await fetch(`${API_BASE_URL}/teams`, {
@@ -419,6 +424,52 @@ export async function listProviderModels(): Promise<ProviderModels> {
   if (!response.ok) {
     const errorBody = await response.json().catch(() => null);
     throw new Error(errorBody?.detail ?? "Could not load model catalog");
+  }
+  return response.json();
+}
+
+function parseApiErrorMessage(errorBody: unknown, fallback: string): string {
+  if (errorBody && typeof errorBody === "object") {
+    const detail = (errorBody as { detail?: unknown }).detail;
+    if (typeof detail === "string") {
+      return detail;
+    }
+    if (detail && typeof detail === "object") {
+      const message = (detail as { message?: unknown }).message;
+      const category = (detail as { category?: unknown }).category;
+      if (typeof message === "string" && typeof category === "string") {
+        return `${category}: ${message}`;
+      }
+      if (typeof message === "string") {
+        return message;
+      }
+    }
+  }
+  return fallback;
+}
+
+export async function probeLmStudioHealth(payload: LMStudioProbePayload): Promise<{ ok: boolean; models_count: number }> {
+  const response = await fetch(`${API_BASE_URL}/teams/lmstudio/health`, {
+    method: "POST",
+    headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(parseApiErrorMessage(errorBody, "Could not verify LM Studio connection"));
+  }
+  return response.json();
+}
+
+export async function listLmStudioModels(payload: LMStudioProbePayload): Promise<{ models: string[] }> {
+  const response = await fetch(`${API_BASE_URL}/teams/lmstudio/models`, {
+    method: "POST",
+    headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(parseApiErrorMessage(errorBody, "Could not list LM Studio models"));
   }
   return response.json();
 }

@@ -8,8 +8,10 @@ import {
   getSessionDetail,
   listKnowledgeDocuments,
   listRecentQueryHistory,
+  listLmStudioModels,
   listSessions,
   logUiEvent,
+  probeLmStudioHealth,
   runQuery,
   uploadKnowledgeFile,
 } from "./api";
@@ -341,6 +343,35 @@ describe("createSession", () => {
       },
       body: JSON.stringify({ title: "Chat session", team_id: "team-1" }),
     });
+  });
+});
+
+describe("LM Studio helpers", () => {
+  it("probes LM Studio health", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ ok: true, models_count: 3 }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await probeLmStudioHealth({ base_url: "http://localhost:1234", passcode: "secret" });
+    expect(result).toEqual({ ok: true, models_count: 3 });
+    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/teams/lmstudio/health", expect.objectContaining({ method: "POST" }));
+  });
+
+  it("lists LM Studio models and normalizes object-detail errors", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ models: ["phi-3-mini"] }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: vi.fn().mockResolvedValue({ detail: { category: "timeout", message: "LM Studio request timed out" } }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(listLmStudioModels({ base_url: "http://localhost:1234" })).resolves.toEqual({ models: ["phi-3-mini"] });
+    await expect(listLmStudioModels({ base_url: "http://localhost:1234" })).rejects.toThrow("timeout: LM Studio request timed out");
   });
 });
 

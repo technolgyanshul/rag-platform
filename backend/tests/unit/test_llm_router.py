@@ -83,24 +83,23 @@ def test_provider_failure_includes_agent_provider_and_model() -> None:
     assert "llama-3.1-8b-instant" in message
 
 
-def test_lmstudio_posts_openai_compatible_chat_completion(monkeypatch) -> None:
+def test_lmstudio_posts_openai_compatible_chat_completion() -> None:
     calls = []
 
-    class FakeResponse:
-        def raise_for_status(self) -> None:
-            return None
+    class FakeLMStudioClient:
+        def chat(self, *, model_name, messages, base_url, passcode=None, timeout_seconds=30.0):
+            calls.append(
+                {
+                    "model_name": model_name,
+                    "messages": messages,
+                    "base_url": base_url,
+                    "passcode": passcode,
+                    "timeout_seconds": timeout_seconds,
+                }
+            )
+            return "local output"
 
-        def json(self):
-            return {"choices": [{"message": {"content": "local output"}}]}
-
-    def fake_post(url, headers, json, timeout):
-        calls.append({"url": url, "headers": headers, "json": json, "timeout": timeout})
-        return FakeResponse()
-
-    import llms.router as router_module
-
-    monkeypatch.setattr(router_module.requests, "post", fake_post)
-    router = LLMRouter(provider_clients={})
+    router = LLMRouter(provider_clients={"lmstudio": FakeLMStudioClient()})
 
     output = router.chat(
         provider="lmstudio",
@@ -114,14 +113,7 @@ def test_lmstudio_posts_openai_compatible_chat_completion(monkeypatch) -> None:
     )
 
     assert output == "local output"
-    assert calls == [
-        {
-            "url": "http://localhost:1234/v1/chat/completions",
-            "headers": {"Content-Type": "application/json", "Authorization": "Bearer secret"},
-            "json": {"model": "local-model", "messages": MESSAGES, "temperature": 0.2},
-            "timeout": 4,
-        }
-    ]
+    assert calls == [{"model_name": "local-model", "messages": MESSAGES, "base_url": "http://localhost:1234", "passcode": "secret", "timeout_seconds": 4.0}]
 
 
 def test_lmstudio_requires_provider_base_url() -> None:
