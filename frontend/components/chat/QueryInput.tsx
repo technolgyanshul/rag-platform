@@ -6,13 +6,15 @@ type QueryInputProps = Readonly<{
   onSubmit: (payload: { sessionId: string; query: string; topK: number }) => Promise<void>;
   onCreateSession: () => Promise<string>;
   disabled?: boolean;
+  disabledReason?: string;
 }>;
 
-export function QueryInput({ onSubmit, onCreateSession, disabled = false }: QueryInputProps) {
+export function QueryInput({ onSubmit, onCreateSession, disabled = false, disabledReason }: QueryInputProps) {
   const [sessionId, setSessionId] = useState("");
   const [query, setQuery] = useState("");
   const [topK, setTopK] = useState(5);
   const [sessionMessage, setSessionMessage] = useState("");
+  const submitLabel = disabledReason ? "Run Query" : disabled ? "Running..." : "Run Query";
 
   const handleCreateSession = async () => {
     try {
@@ -82,6 +84,7 @@ export function QueryInput({ onSubmit, onCreateSession, disabled = false }: Quer
       </div>
 
       {sessionMessage ? <p className="status-message">{sessionMessage}</p> : null}
+      {disabledReason ? <p className="status-message">{disabledReason}</p> : null}
 
       <label className="form-field" htmlFor="chat-query">
         Question
@@ -94,9 +97,7 @@ export function QueryInput({ onSubmit, onCreateSession, disabled = false }: Quer
         />
       </label>
 
-      <button type="submit" disabled={disabled}>
-        {disabled ? "Running..." : "Run Query"}
-      </button>
+      <button type="submit" disabled={disabled}>{submitLabel}</button>
     </form>
   );
 }

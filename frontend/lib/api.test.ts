@@ -1,6 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ApiRequestError, getDocumentDownloadUrl, listKnowledgeDocuments, listRecentQueryHistory, logUiEvent, uploadKnowledgeFile } from "./api";
+import {
+  ApiRequestError,
+  createSession,
+  getDocumentDownloadUrl,
+  listKnowledgeDocuments,
+  listRecentQueryHistory,
+  logUiEvent,
+  runQuery,
+  uploadKnowledgeFile,
+} from "./api";
 
 vi.mock("@/utils/supabase/client", () => ({
   createClient: vi.fn(() => ({
@@ -136,6 +145,83 @@ describe("logUiEvent", () => {
         Authorization: "Bearer test-token",
       },
       body: expect.stringContaining('"event_name":"query_submit"'),
+    });
+  });
+});
+
+describe("createSession", () => {
+  it("sends team_id when creating a team-scoped session", async () => {
+    const mockResponse = {
+      id: "session-1",
+      title: "Chat session",
+      created_at: "2026-05-14T00:00:00Z",
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(mockResponse),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await createSession({ title: "Chat session", team_id: "team-1" });
+
+    expect(result).toEqual(mockResponse);
+    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/sessions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-token",
+      },
+      body: JSON.stringify({ title: "Chat session", team_id: "team-1" }),
+    });
+  });
+});
+
+describe("runQuery", () => {
+  it("sends team_id with the query payload", async () => {
+    const mockResponse = {
+      query_id: "query-1",
+      query: "What changed?",
+      final_answer: "A team-aware answer.",
+      reasoning: null,
+      sources: [],
+      citations: [],
+      traces: [],
+      scorecard: null,
+      retrieval_count: 0,
+      insufficient_context: false,
+      model_version: "test-model",
+      retrieval_metadata: {
+        embedding_model_version: "test-embedding",
+        index_version: "test-index",
+        top_k: 5,
+      },
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(mockResponse),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await runQuery({
+      query: "What changed?",
+      session_id: "session-1",
+      team_id: "team-1",
+      top_k: 5,
+    });
+
+    expect(result).toEqual(mockResponse);
+    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/query", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-token",
+      },
+      body: JSON.stringify({
+        query: "What changed?",
+        session_id: "session-1",
+        team_id: "team-1",
+        top_k: 5,
+      }),
     });
   });
 });

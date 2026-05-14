@@ -82,6 +82,7 @@ export type DashboardMetrics = {
 export type SessionRecord = {
   id: string;
   title: string | null;
+  team_id?: string | null;
   created_at: string;
 };
 

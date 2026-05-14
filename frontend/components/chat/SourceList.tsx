@@ -14,7 +14,7 @@ export function SourceList({ sources }: SourceListProps) {
       {sources.map((source, index) => (
         <li key={`${source.document_id}-${source.chunk_index}-${index}`} className="source-item">
           <p>
-            <strong>{source.filename}</strong>#{source.chunk_index} (score: {source.score.toFixed(3)})
+            <strong>Source {index + 1}: {source.filename}</strong>#{source.chunk_index} (score: {source.score.toFixed(3)})
           </p>
           <p>{source.content_preview}</p>
         </li>

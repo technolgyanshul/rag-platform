@@ -139,6 +139,7 @@ export async function getDocumentDownloadUrl(documentId: string): Promise<Docume
 export async function runQuery(payload: {
   query: string;
   session_id: string;
+  team_id: string;
   top_k?: number;
 }): Promise<QueryResponse> {
   const response = await fetch(`${API_BASE_URL}/query`, {
@@ -155,11 +156,17 @@ export async function runQuery(payload: {
   return response.json();
 }
 
-export async function createSession(title?: string): Promise<SessionRecord> {
+export type CreateSessionPayload = {
+  title?: string;
+  team_id?: string;
+};
+
+export async function createSession(payload?: string | CreateSessionPayload): Promise<SessionRecord> {
+  const body = typeof payload === "string" ? { title: payload } : (payload ?? {});
   const response = await fetch(`${API_BASE_URL}/sessions`, {
     method: "POST",
     headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ title }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
