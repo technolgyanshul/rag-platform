@@ -59,6 +59,7 @@ class _FallbackStore:
     teams: list[dict[str, Any]] = field(default_factory=list)
     agents: list[dict[str, Any]] = field(default_factory=list)
     sessions: list[dict[str, Any]] = field(default_factory=list)
+    messages: list[dict[str, Any]] = field(default_factory=list)
     documents: list[dict[str, Any]] = field(default_factory=list)
     chunks: list[dict[str, Any]] = field(default_factory=list)
     queries: list[dict[str, Any]] = field(default_factory=list)
@@ -73,6 +74,7 @@ def reset_fallback_store() -> None:
     _FALLBACK.teams.clear()
     _FALLBACK.agents.clear()
     _FALLBACK.sessions.clear()
+    _FALLBACK.messages.clear()
     _FALLBACK.documents.clear()
     _FALLBACK.chunks.clear()
     _FALLBACK.queries.clear()
@@ -360,6 +362,7 @@ class SupabaseRepository:
 
         session_ids = {row.get("id") for row in _FALLBACK.sessions if row.get("team_id") == team_id}
         _FALLBACK.sessions = [row for row in _FALLBACK.sessions if row.get("team_id") != team_id]
+        _FALLBACK.messages = [row for row in _FALLBACK.messages if row.get("session_id") not in session_ids]
         _FALLBACK.queries = [row for row in _FALLBACK.queries if row.get("session_id") not in session_ids]
         _FALLBACK.agent_traces = [row for row in _FALLBACK.agent_traces if row.get("session_id") not in session_ids]
         _FALLBACK.scorecards = [row for row in _FALLBACK.scorecards if row.get("session_id") not in session_ids]
@@ -842,6 +845,11 @@ class SupabaseRepository:
             "citation_accuracy": None,
             "insight_depth": None,
             "response_time_ms": response_time_ms,
+            "sources": [],
+            "citations": [],
+            "retrieval_metadata": {},
+            "model_version": None,
+            "insufficient_context": False,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -861,6 +869,11 @@ class SupabaseRepository:
         final_answer: str,
         scorecard: dict[str, Any] | None,
         response_time_ms: int,
+        sources: list[dict[str, Any]] | None = None,
+        citations: list[dict[str, Any]] | None = None,
+        retrieval_metadata: dict[str, Any] | None = None,
+        model_version: str | None = None,
+        insufficient_context: bool | None = None,
     ) -> dict[str, Any]:
         scorecard = scorecard or {}
         payload = {
@@ -870,6 +883,16 @@ class SupabaseRepository:
             "insight_depth": scorecard.get("insight_depth"),
             "response_time_ms": response_time_ms,
         }
+        if sources is not None:
+            payload["sources"] = sources
+        if citations is not None:
+            payload["citations"] = citations
+        if retrieval_metadata is not None:
+            payload["retrieval_metadata"] = retrieval_metadata
+        if model_version is not None:
+            payload["model_version"] = model_version
+        if insufficient_context is not None:
+            payload["insufficient_context"] = insufficient_context
 
         if self._client:
             existing = self._ensure_query_owned(query_id=query_id, user_id=user_id)
@@ -881,6 +904,49 @@ class SupabaseRepository:
         row = self._ensure_query_owned(query_id=query_id, user_id=user_id)
         row.update(payload)
         return row
+
+    def create_message(
+        self,
+        user_id: str,
+        session_id: str,
+        role: str,
+        content: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        self._ensure_session_owned(session_id=session_id, user_id=user_id)
+        payload = {
+            "id": str(uuid4()),
+            "session_id": session_id,
+            "role": role,
+            "content": content,
+            "metadata": metadata or {},
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        if self._client:
+            result = self._client.table("messages").insert(payload).execute()
+            if result.data:
+                return result.data[0]
+            raise RuntimeError("Failed to create message")
+
+        _FALLBACK.messages.append(payload)
+        return payload
+
+    def list_messages(self, user_id: str, session_id: str) -> list[dict[str, Any]]:
+        self._ensure_session_owned(session_id=session_id, user_id=user_id)
+        if self._client:
+            result = (
+                self._client.table("messages")
+                .select("*")
+                .eq("session_id", session_id)
+                .order("created_at", desc=False)
+                .execute()
+            )
+            return result.data or []
+
+        rows = [row for row in _FALLBACK.messages if row.get("session_id") == session_id]
+        rows.sort(key=lambda item: str(item.get("created_at", "")))
+        return rows
 
     def create_agent_trace(
         self,
@@ -1011,6 +1077,171 @@ class SupabaseRepository:
         rows = [row for row in _FALLBACK.queries if row.get("session_id") == session_id]
         rows.sort(key=lambda item: item.get("created_at", ""), reverse=True)
         return rows[:limit]
+
+    def list_sessions(self, user_id: str, limit: int = 500) -> list[dict[str, Any]]:
+        if self._client:
+            sessions_result = (
+                self._client.table("sessions")
+                .select("*")
+                .eq("user_id", user_id)
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            sessions = sessions_result.data or []
+            if not sessions:
+                return []
+
+            team_ids = sorted({str(row.get("team_id")) for row in sessions if row.get("team_id")})
+            team_name_by_id: dict[str, str | None] = {}
+            if team_ids:
+                teams_result = self._client.table("teams").select("id,name").in_("id", team_ids).execute()
+                team_name_by_id = {
+                    str(row.get("id")): row.get("name") for row in (teams_result.data or []) if row.get("id")
+                }
+
+            session_ids = [str(row.get("id")) for row in sessions if row.get("id")]
+            query_counts: dict[str, int] = {}
+            query_last: dict[str, str] = {}
+            if session_ids:
+                queries_result = (
+                    self._client.table("queries")
+                    .select("session_id,created_at")
+                    .in_("session_id", session_ids)
+                    .order("created_at", desc=True)
+                    .limit(limit * 50)
+                    .execute()
+                )
+                for row in queries_result.data or []:
+                    session_id = str(row.get("session_id", ""))
+                    if not session_id:
+                        continue
+                    query_counts[session_id] = query_counts.get(session_id, 0) + 1
+                    created_at = str(row.get("created_at", ""))
+                    if created_at and session_id not in query_last:
+                        query_last[session_id] = created_at
+
+            return [
+                {
+                    "id": str(row.get("id", "")),
+                    "team_id": str(row.get("team_id", "")),
+                    "team_name": team_name_by_id.get(str(row.get("team_id", ""))),
+                    "title": row.get("title"),
+                    "created_at": str(row.get("created_at", "")),
+                    "query_count": int(query_counts.get(str(row.get("id", "")), 0)),
+                    "last_query_at": query_last.get(str(row.get("id", ""))),
+                }
+                for row in sessions
+            ]
+
+        sessions = [row for row in _FALLBACK.sessions if str(row.get("user_id", "")) == user_id]
+        sessions.sort(key=lambda item: str(item.get("created_at", "")), reverse=True)
+        sessions = sessions[:limit]
+        owned_session_ids = {str(item.get("id", "")) for item in sessions}
+        team_name_by_id = {
+            str(row.get("id")): row.get("name") for row in _FALLBACK.teams if str(row.get("user_id", "")) == user_id
+        }
+
+        query_counts: dict[str, int] = {}
+        query_last: dict[str, str] = {}
+        for row in _FALLBACK.queries:
+            session_id = str(row.get("session_id", ""))
+            if session_id not in owned_session_ids:
+                continue
+            query_counts[session_id] = query_counts.get(session_id, 0) + 1
+            created_at = str(row.get("created_at", ""))
+            if created_at and (session_id not in query_last or created_at > query_last[session_id]):
+                query_last[session_id] = created_at
+
+        return [
+            {
+                "id": str(row.get("id", "")),
+                "team_id": str(row.get("team_id", "")),
+                "team_name": team_name_by_id.get(str(row.get("team_id", ""))),
+                "title": row.get("title"),
+                "created_at": str(row.get("created_at", "")),
+                "query_count": int(query_counts.get(str(row.get("id", "")), 0)),
+                "last_query_at": query_last.get(str(row.get("id", ""))),
+            }
+            for row in sessions
+        ]
+
+    def list_scorecards(
+        self,
+        user_id: str,
+        session_id: str,
+        query_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        self._ensure_session_owned(session_id=session_id, user_id=user_id)
+        if query_id is not None:
+            query = self._ensure_query_owned(query_id=query_id, user_id=user_id)
+            if str(query.get("session_id")) != session_id:
+                raise PermissionError(SESSION_ACCESS_ERROR_MESSAGE)
+
+        if self._client:
+            query_builder = self._client.table("scorecards").select("*").eq("session_id", session_id)
+            if query_id is not None:
+                query_builder = query_builder.eq("query_id", query_id)
+            result = query_builder.order("created_at", desc=False).execute()
+            return result.data or []
+
+        rows = [row for row in _FALLBACK.scorecards if row.get("session_id") == session_id]
+        if query_id is not None:
+            rows = [row for row in rows if row.get("query_id") == query_id]
+        rows.sort(key=lambda item: str(item.get("created_at", "")))
+        return rows
+
+    def get_session_detail(self, user_id: str, session_id: str) -> dict[str, Any]:
+        session = self.get_session(user_id=user_id, session_id=session_id)
+        if session is None:
+            raise PermissionError(SESSION_ACCESS_ERROR_MESSAGE)
+
+        team_id = str(session.get("team_id", ""))
+        team_name: str | None = None
+        if team_id:
+            team = self.get_team(user_id=user_id, team_id=team_id)
+            team_name = team.get("name") if team else None
+
+        messages = self.list_messages(user_id=user_id, session_id=session_id)
+        scorecards = self.list_scorecards(user_id=user_id, session_id=session_id)
+        traces = self.list_agent_traces(user_id=user_id, session_id=session_id)
+        scorecard_by_query_id = {
+            str(row.get("query_id")): row for row in scorecards if row.get("query_id") is not None
+        }
+        traces_by_query_id: dict[str, list[dict[str, Any]]] = {}
+        for row in traces:
+            query_id = row.get("query_id")
+            if query_id is None:
+                continue
+            key = str(query_id)
+            traces_by_query_id.setdefault(key, []).append(row)
+
+        queries = self.list_queries(user_id=user_id, session_id=session_id, limit=500)
+        queries.sort(key=lambda item: str(item.get("created_at", "")))
+        normalized_queries: list[dict[str, Any]] = []
+        for query in queries:
+            query_id = str(query.get("id", ""))
+            normalized_query = dict(query)
+            normalized_query.setdefault("sources", [])
+            normalized_query.setdefault("citations", [])
+            normalized_query.setdefault("retrieval_metadata", {})
+            normalized_query.setdefault("model_version", None)
+            normalized_query.setdefault("insufficient_context", False)
+            normalized_query["scorecard"] = scorecard_by_query_id.get(query_id)
+            normalized_query["agent_traces"] = traces_by_query_id.get(query_id, [])
+            normalized_queries.append(normalized_query)
+
+        return {
+            "session": {
+                "id": str(session.get("id", "")),
+                "team_id": team_id,
+                "team_name": team_name,
+                "title": session.get("title"),
+                "created_at": str(session.get("created_at", "")),
+            },
+            "messages": messages,
+            "queries": normalized_queries,
+        }
 
     def list_recent_queries(self, user_id: str, limit: int = 50) -> list[dict[str, Any]]:
         if self._client:
