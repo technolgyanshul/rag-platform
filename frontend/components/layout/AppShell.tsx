@@ -1,10 +1,11 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 
 import { Header } from "./Header";
 import { NavItem, Sidebar } from "./Sidebar";
+import { fieldOnlyClipboardText } from "../../lib/clipboard";
 
 type AppShellProps = {
   title: string;
@@ -25,6 +26,21 @@ const navItems: NavItem[] = [
 export function AppShell({ title, subtitle, actions, children }: AppShellProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    const handleCopy = (event: ClipboardEvent) => {
+      const clipboardText = fieldOnlyClipboardText(document.activeElement);
+      if (clipboardText === null || !event.clipboardData) {
+        return;
+      }
+      event.clipboardData.setData("text/plain", clipboardText);
+      event.preventDefault();
+    };
+    document.addEventListener("copy", handleCopy, true);
+    return () => {
+      document.removeEventListener("copy", handleCopy, true);
+    };
+  }, []);
 
   return (
     <div className="app-shell">
