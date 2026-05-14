@@ -20,8 +20,8 @@ DEFAULT_TEAM_AGENTS: tuple[dict[str, Any], ...] = (
         "name": "Researcher",
         "role": "researcher",
         "system_prompt": "Find the strongest evidence in the retrieved sources.",
-        "model_provider": "ollama",
-        "model_name": "llama3.1:8b",
+        "model_provider": "lmstudio",
+        "model_name": "local-model",
         "response_style": "evidence-first",
         "execution_order": 0,
     },
@@ -29,8 +29,8 @@ DEFAULT_TEAM_AGENTS: tuple[dict[str, Any], ...] = (
         "name": "Critic",
         "role": "critic",
         "system_prompt": "Challenge weak claims and identify unsupported statements.",
-        "model_provider": "ollama",
-        "model_name": "llama3.1:8b",
+        "model_provider": "lmstudio",
+        "model_name": "local-model",
         "response_style": "skeptical",
         "execution_order": 1,
     },
@@ -38,12 +38,16 @@ DEFAULT_TEAM_AGENTS: tuple[dict[str, Any], ...] = (
         "name": "Synthesizer",
         "role": "synthesizer",
         "system_prompt": "Synthesize evidence and produce a concise final answer.",
-        "model_provider": "ollama",
-        "model_name": "llama3.1:8b",
+        "model_provider": "lmstudio",
+        "model_name": "local-model",
         "response_style": "balanced",
         "execution_order": 2,
     },
 )
+
+
+def default_team_agents() -> list[dict[str, Any]]:
+    return list(DEFAULT_TEAM_AGENTS)
 
 
 class DocumentStorageError(RuntimeError):
@@ -58,6 +62,8 @@ class _FallbackStore:
     documents: list[dict[str, Any]] = field(default_factory=list)
     chunks: list[dict[str, Any]] = field(default_factory=list)
     queries: list[dict[str, Any]] = field(default_factory=list)
+    agent_traces: list[dict[str, Any]] = field(default_factory=list)
+    scorecards: list[dict[str, Any]] = field(default_factory=list)
 
 
 _FALLBACK = _FallbackStore()
@@ -70,6 +76,8 @@ def reset_fallback_store() -> None:
     _FALLBACK.documents.clear()
     _FALLBACK.chunks.clear()
     _FALLBACK.queries.clear()
+    _FALLBACK.agent_traces.clear()
+    _FALLBACK.scorecards.clear()
 
 
 class SupabaseRepository:
@@ -180,6 +188,27 @@ class SupabaseRepository:
         if session is None:
             raise PermissionError(SESSION_ACCESS_ERROR_MESSAGE)
 
+    def _find_fallback_query(self, query_id: str) -> dict[str, Any] | None:
+        for row in _FALLBACK.queries:
+            if row.get("id") == query_id:
+                return row
+        return None
+
+    def _ensure_query_owned(self, query_id: str, user_id: str) -> dict[str, Any]:
+        if self._client:
+            result = self._client.table("queries").select("*").eq("id", query_id).limit(1).execute()
+            if not result.data:
+                raise PermissionError(SESSION_ACCESS_ERROR_MESSAGE)
+            row = result.data[0]
+            self._ensure_session_owned(session_id=str(row["session_id"]), user_id=user_id)
+            return row
+
+        row = self._find_fallback_query(query_id)
+        if row is None:
+            raise PermissionError(SESSION_ACCESS_ERROR_MESSAGE)
+        self._ensure_session_owned(session_id=str(row["session_id"]), user_id=user_id)
+        return row
+
     def get_session(self, user_id: str, session_id: str) -> dict[str, Any] | None:
         if self._client:
             result = self._client.table("sessions").select("*").eq("id", session_id).limit(1).execute()
@@ -260,6 +289,7 @@ class SupabaseRepository:
         user_id: str,
         name: str,
         domain: str | None = None,
+        collaboration_rule: str = "sequential",
         team_id: str | None = None,
         seed_default_agents: bool = True,
     ) -> dict[str, Any]:
@@ -268,6 +298,7 @@ class SupabaseRepository:
             "user_id": user_id,
             "name": name,
             "domain": domain,
+            "collaboration_rule": collaboration_rule,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -294,7 +325,7 @@ class SupabaseRepository:
 
     def update_team(self, user_id: str, team_id: str, **updates: Any) -> dict[str, Any]:
         self._ensure_team_owned(user_id=user_id, team_id=team_id)
-        payload = {key: value for key, value in updates.items() if key in {"name", "domain"}}
+        payload = {key: value for key, value in updates.items() if key in {"name", "domain", "collaboration_rule"}}
         if not payload:
             existing = self.get_team(user_id=user_id, team_id=team_id)
             if existing is None:
@@ -330,6 +361,8 @@ class SupabaseRepository:
         session_ids = {row.get("id") for row in _FALLBACK.sessions if row.get("team_id") == team_id}
         _FALLBACK.sessions = [row for row in _FALLBACK.sessions if row.get("team_id") != team_id]
         _FALLBACK.queries = [row for row in _FALLBACK.queries if row.get("session_id") not in session_ids]
+        _FALLBACK.agent_traces = [row for row in _FALLBACK.agent_traces if row.get("session_id") not in session_ids]
+        _FALLBACK.scorecards = [row for row in _FALLBACK.scorecards if row.get("session_id") not in session_ids]
 
         document_ids = {row.get("id") for row in _FALLBACK.documents if row.get("team_id") == team_id}
         _FALLBACK.documents = [row for row in _FALLBACK.documents if row.get("team_id") != team_id]
@@ -375,6 +408,8 @@ class SupabaseRepository:
         model_name: str,
         response_style: str,
         execution_order: int,
+        provider_base_url: str | None = None,
+        provider_passcode: str | None = None,
         agent_id: str | None = None,
     ) -> dict[str, Any]:
         self._ensure_team_owned(user_id=user_id, team_id=team_id)
@@ -388,6 +423,8 @@ class SupabaseRepository:
             "model_name": model_name,
             "response_style": response_style,
             "execution_order": execution_order,
+            "provider_base_url": provider_base_url,
+            "provider_passcode": provider_passcode,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -423,6 +460,8 @@ class SupabaseRepository:
             "model_name",
             "response_style",
             "execution_order",
+            "provider_base_url",
+            "provider_passcode",
         }
         payload = {key: value for key, value in updates.items() if key in allowed_keys}
         if not payload:
@@ -784,6 +823,176 @@ class SupabaseRepository:
                 return result.data[0]
 
         _FALLBACK.queries.append(payload)
+        return payload
+
+    def create_query(
+        self,
+        user_id: str,
+        session_id: str,
+        query_text: str,
+        response_time_ms: int | None = None,
+    ) -> dict[str, Any]:
+        self._ensure_session_owned(session_id=session_id, user_id=user_id)
+        payload = {
+            "id": str(uuid4()),
+            "session_id": session_id,
+            "query_text": query_text,
+            "final_answer": None,
+            "overall_score": None,
+            "citation_accuracy": None,
+            "insight_depth": None,
+            "response_time_ms": response_time_ms,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        if self._client:
+            result = self._client.table("queries").insert(payload).execute()
+            if result.data:
+                return result.data[0]
+            raise RuntimeError("Failed to create query")
+
+        _FALLBACK.queries.append(payload)
+        return payload
+
+    def update_query_result(
+        self,
+        user_id: str,
+        query_id: str,
+        final_answer: str,
+        scorecard: dict[str, Any] | None,
+        response_time_ms: int,
+    ) -> dict[str, Any]:
+        scorecard = scorecard or {}
+        payload = {
+            "final_answer": final_answer,
+            "overall_score": scorecard.get("overall") or scorecard.get("overall_quality"),
+            "citation_accuracy": scorecard.get("citation_accuracy"),
+            "insight_depth": scorecard.get("insight_depth"),
+            "response_time_ms": response_time_ms,
+        }
+
+        if self._client:
+            existing = self._ensure_query_owned(query_id=query_id, user_id=user_id)
+            result = self._client.table("queries").update(payload).eq("id", query_id).execute()
+            if result.data:
+                return result.data[0]
+            return {**existing, **payload}
+
+        row = self._ensure_query_owned(query_id=query_id, user_id=user_id)
+        row.update(payload)
+        return row
+
+    def create_agent_trace(
+        self,
+        user_id: str,
+        session_id: str,
+        query_id: str | None,
+        agent_id: str | None,
+        agent_name: str,
+        agent_role: str,
+        model_provider: str,
+        model_name: str,
+        input_payload: dict[str, Any],
+        output: str,
+        citations: list[dict[str, Any]],
+        latency_ms: int | None,
+        status: str,
+        error: str | None,
+    ) -> dict[str, Any]:
+        self._ensure_session_owned(session_id=session_id, user_id=user_id)
+        if query_id is not None:
+            query = self._ensure_query_owned(query_id=query_id, user_id=user_id)
+            if str(query.get("session_id")) != session_id:
+                raise PermissionError(SESSION_ACCESS_ERROR_MESSAGE)
+
+        payload = {
+            "id": str(uuid4()),
+            "session_id": session_id,
+            "query_id": query_id,
+            "agent_id": agent_id,
+            "agent_name": agent_name,
+            "agent_role": agent_role,
+            "model_provider": model_provider,
+            "model_name": model_name,
+            "input": input_payload,
+            "output": output,
+            "citations": citations,
+            "latency_ms": latency_ms,
+            "status": status,
+            "error": error,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        if self._client:
+            result = self._client.table("agent_traces").insert(payload).execute()
+            if result.data:
+                return result.data[0]
+            raise RuntimeError("Failed to create agent trace")
+
+        _FALLBACK.agent_traces.append(payload)
+        return payload
+
+    def list_agent_traces(
+        self,
+        user_id: str,
+        session_id: str,
+        query_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        self._ensure_session_owned(session_id=session_id, user_id=user_id)
+        if query_id is not None:
+            query = self._ensure_query_owned(query_id=query_id, user_id=user_id)
+            if str(query.get("session_id")) != session_id:
+                raise PermissionError(SESSION_ACCESS_ERROR_MESSAGE)
+
+        if self._client:
+            query_builder = self._client.table("agent_traces").select("*").eq("session_id", session_id)
+            if query_id is not None:
+                query_builder = query_builder.eq("query_id", query_id)
+            result = query_builder.order("created_at", desc=False).execute()
+            return result.data or []
+
+        rows = [row for row in _FALLBACK.agent_traces if row.get("session_id") == session_id]
+        if query_id is not None:
+            rows = [row for row in rows if row.get("query_id") == query_id]
+        rows.sort(key=lambda item: str(item.get("created_at", "")))
+        return rows
+
+    def save_scorecard(
+        self,
+        user_id: str,
+        session_id: str,
+        query_id: str | None,
+        overall_quality: int | None,
+        citation_accuracy: int | None,
+        insight_depth: int | None,
+        model_contribution_breakdown: dict[str, Any],
+        notes: str | None,
+    ) -> dict[str, Any]:
+        self._ensure_session_owned(session_id=session_id, user_id=user_id)
+        if query_id is not None:
+            query = self._ensure_query_owned(query_id=query_id, user_id=user_id)
+            if str(query.get("session_id")) != session_id:
+                raise PermissionError(SESSION_ACCESS_ERROR_MESSAGE)
+
+        payload = {
+            "id": str(uuid4()),
+            "session_id": session_id,
+            "query_id": query_id,
+            "overall_quality": overall_quality,
+            "citation_accuracy": citation_accuracy,
+            "insight_depth": insight_depth,
+            "model_contribution_breakdown": model_contribution_breakdown,
+            "notes": notes,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        if self._client:
+            result = self._client.table("scorecards").insert(payload).execute()
+            if result.data:
+                return result.data[0]
+            raise RuntimeError("Failed to save scorecard")
+
+        _FALLBACK.scorecards.append(payload)
         return payload
 
     def list_queries(self, user_id: str, session_id: str, limit: int = 50) -> list[dict[str, Any]]:

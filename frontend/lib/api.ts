@@ -1,9 +1,13 @@
 import {
+  Agent,
+  CollaborationRule,
   DashboardMetrics,
   DocumentDownloadResponse,
   QueryHistoryItem,
   QueryResponse,
   SessionRecord,
+  Team,
+  ProviderModels,
 } from "./types";
 import { createClient } from "@/utils/supabase/client";
 
@@ -214,4 +218,151 @@ export async function logUiEvent(payload: UiEventPayload): Promise<void> {
     const errorBody = await response.json().catch(() => null);
     throw new Error(errorBody?.detail ?? "Could not log UI event");
   }
+}
+
+export type TeamCreatePayload = {
+  name: string;
+  domain?: string | null;
+  collaboration_rule?: CollaborationRule;
+};
+
+export type TeamPatchPayload = Partial<TeamCreatePayload>;
+
+export type AgentCreatePayload = {
+  name: string;
+  role: string;
+  system_prompt: string;
+  model_provider?: string;
+  model_name?: string;
+  provider_base_url?: string | null;
+  provider_passcode?: string | null;
+  response_style?: string | null;
+  execution_order?: number;
+};
+
+export type AgentPatchPayload = Partial<AgentCreatePayload>;
+
+export async function listTeams(): Promise<Team[]> {
+  const response = await fetch(`${API_BASE_URL}/teams`, {
+    headers: await buildAuthHeaders(),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.detail ?? "Could not load teams");
+  }
+  return response.json();
+}
+
+export async function createTeam(payload: TeamCreatePayload): Promise<Team> {
+  const response = await fetch(`${API_BASE_URL}/teams`, {
+    method: "POST",
+    headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.detail ?? "Could not create team");
+  }
+  return response.json();
+}
+
+export async function updateTeam(teamId: string, payload: TeamPatchPayload): Promise<Team> {
+  const response = await fetch(`${API_BASE_URL}/teams/${encodeURIComponent(teamId)}`, {
+    method: "PATCH",
+    headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.detail ?? "Could not update team");
+  }
+  return response.json();
+}
+
+export async function deleteTeam(teamId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/teams/${encodeURIComponent(teamId)}`, {
+    method: "DELETE",
+    headers: await buildAuthHeaders(),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.detail ?? "Could not delete team");
+  }
+}
+
+export async function listTeamAgents(teamId: string): Promise<Agent[]> {
+  const response = await fetch(`${API_BASE_URL}/teams/${encodeURIComponent(teamId)}/agents`, {
+    headers: await buildAuthHeaders(),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.detail ?? "Could not load agents");
+  }
+  return response.json();
+}
+
+export async function createTeamAgent(teamId: string, payload: AgentCreatePayload): Promise<Agent> {
+  const response = await fetch(`${API_BASE_URL}/teams/${encodeURIComponent(teamId)}/agents`, {
+    method: "POST",
+    headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.detail ?? "Could not create agent");
+  }
+  return response.json();
+}
+
+export async function updateTeamAgent(teamId: string, agentId: string, payload: AgentPatchPayload): Promise<Agent> {
+  const response = await fetch(
+    `${API_BASE_URL}/teams/${encodeURIComponent(teamId)}/agents/${encodeURIComponent(agentId)}`,
+    {
+      method: "PATCH",
+      headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.detail ?? "Could not update agent");
+  }
+  return response.json();
+}
+
+export async function deleteTeamAgent(teamId: string, agentId: string): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/teams/${encodeURIComponent(teamId)}/agents/${encodeURIComponent(agentId)}`,
+    {
+      method: "DELETE",
+      headers: await buildAuthHeaders(),
+    },
+  );
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.detail ?? "Could not delete agent");
+  }
+}
+
+export async function listProviderModels(): Promise<ProviderModels> {
+  const response = await fetch(`${API_BASE_URL}/teams/models`, {
+    headers: await buildAuthHeaders(),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.detail ?? "Could not load model catalog");
+  }
+  return response.json();
+}
+
+export async function listAgentDefaults(): Promise<Agent[]> {
+  const response = await fetch(`${API_BASE_URL}/teams/defaults/agents`, {
+    headers: await buildAuthHeaders(),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.detail ?? "Could not load agent defaults");
+  }
+  const payload = await response.json();
+  return Array.isArray(payload?.agents) ? payload.agents : [];
 }

@@ -6,21 +6,34 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from core.auth import AuthUser, get_current_user
-from core.model_registry import ModelValidationError, default_model_selection, validate_model_selection
-from db.supabase import SupabaseRepository
+from core.model_registry import ModelValidationError, default_model_selection, model_catalog, validate_model_selection
+from db.supabase import SupabaseRepository, default_team_agents
 
 
 router = APIRouter(prefix="/teams", tags=["teams"])
+_COLLABORATION_RULES = {"sequential", "debate", "hierarchical"}
+
+
+class ModelsResponse(BaseModel):
+    groq: list[str]
+    sarvam: list[str]
+    lmstudio: list[str]
+
+
+class AgentDefaultsResponse(BaseModel):
+    agents: list[AgentResponse]
 
 
 class TeamCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     domain: str | None = Field(default=None, max_length=200)
+    collaboration_rule: str = Field(default="sequential", min_length=1, max_length=32)
 
 
 class TeamPatchRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     domain: str | None = Field(default=None, max_length=200)
+    collaboration_rule: str | None = Field(default=None, min_length=1, max_length=32)
 
 
 class TeamResponse(BaseModel):
@@ -28,6 +41,7 @@ class TeamResponse(BaseModel):
     user_id: str
     name: str
     domain: str | None = None
+    collaboration_rule: str
     created_at: str
 
 
@@ -37,6 +51,8 @@ class AgentCreateRequest(BaseModel):
     system_prompt: str = Field(min_length=1)
     model_provider: str | None = Field(default=None, min_length=1, max_length=50)
     model_name: str | None = Field(default=None, min_length=1, max_length=120)
+    provider_base_url: str | None = Field(default=None, max_length=500)
+    provider_passcode: str | None = Field(default=None, max_length=500)
     response_style: str | None = Field(default=None, max_length=120)
     execution_order: int = Field(default=0, ge=0, le=20)
 
@@ -47,6 +63,8 @@ class AgentPatchRequest(BaseModel):
     system_prompt: str | None = Field(default=None, min_length=1)
     model_provider: str | None = Field(default=None, min_length=1, max_length=50)
     model_name: str | None = Field(default=None, min_length=1, max_length=120)
+    provider_base_url: str | None = Field(default=None, max_length=500)
+    provider_passcode: str | None = Field(default=None, max_length=500)
     response_style: str | None = Field(default=None, max_length=120)
     execution_order: int | None = Field(default=None, ge=0, le=20)
 
@@ -59,6 +77,8 @@ class AgentResponse(BaseModel):
     system_prompt: str
     model_provider: str
     model_name: str
+    provider_base_url: str | None = None
+    provider_passcode_configured: bool = False
     response_style: str | None = None
     execution_order: int
     created_at: str
@@ -70,6 +90,7 @@ def _normalize_team_payload(row: dict[str, Any]) -> TeamResponse:
         user_id=str(row.get("user_id", "")),
         name=str(row.get("name", "")),
         domain=row.get("domain"),
+        collaboration_rule=str(row.get("collaboration_rule", "sequential")),
         created_at=str(row.get("created_at", "")),
     )
 
@@ -83,6 +104,8 @@ def _normalize_agent_payload(row: dict[str, Any]) -> AgentResponse:
         system_prompt=str(row.get("system_prompt", "")),
         model_provider=str(row.get("model_provider", "")),
         model_name=str(row.get("model_name", "")),
+        provider_base_url=row.get("provider_base_url"),
+        provider_passcode_configured=bool(row.get("provider_passcode")),
         response_style=row.get("response_style"),
         execution_order=int(row.get("execution_order", 0)),
         created_at=str(row.get("created_at", "")),
@@ -100,6 +123,53 @@ def _ensure_owned_team(repository: SupabaseRepository, user_id: str, team_id: st
     return row
 
 
+def _normalize_collaboration_rule(value: str) -> str:
+    normalized = value.strip().lower()
+    if normalized not in _COLLABORATION_RULES:
+        raise HTTPException(status_code=400, detail="Unsupported collaboration_rule")
+    return normalized
+
+
+@router.get("/models", response_model=ModelsResponse, responses={503: {"description": "Model catalog temporarily unavailable"}})
+async def list_models(_auth_user: AuthUser = Depends(get_current_user)) -> ModelsResponse:
+    try:
+        catalog = model_catalog()
+        return ModelsResponse(**catalog)
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Model catalog temporarily unavailable") from error
+
+
+@router.get(
+    "/defaults/agents",
+    response_model=AgentDefaultsResponse,
+    responses={503: {"description": "Agent defaults temporarily unavailable"}},
+)
+async def list_agent_defaults(_auth_user: AuthUser = Depends(get_current_user)) -> AgentDefaultsResponse:
+    try:
+        defaults = default_team_agents()
+        rows: list[AgentResponse] = []
+        for template in defaults:
+            rows.append(
+                AgentResponse(
+                    id="",
+                    team_id="",
+                    name=str(template["name"]),
+                    role=str(template["role"]),
+                    system_prompt=str(template["system_prompt"]),
+                    model_provider="",
+                    model_name="",
+                    provider_base_url=None,
+                    provider_passcode_configured=False,
+                    response_style=str(template["response_style"]),
+                    execution_order=int(template["execution_order"]),
+                    created_at="",
+                )
+            )
+        return AgentDefaultsResponse(agents=rows)
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Agent defaults temporarily unavailable") from error
+
+
 @router.get("", response_model=list[TeamResponse], responses={503: {"description": "Team service temporarily unavailable"}})
 async def list_teams(auth_user: AuthUser = Depends(get_current_user)) -> list[TeamResponse]:
     try:
@@ -112,7 +182,12 @@ async def list_teams(auth_user: AuthUser = Depends(get_current_user)) -> list[Te
 @router.post("", response_model=TeamResponse, responses={400: {"description": "Validation failed"}, 503: {"description": "Team service temporarily unavailable"}})
 async def create_team(payload: TeamCreateRequest, auth_user: AuthUser = Depends(get_current_user)) -> TeamResponse:
     try:
-        row = SupabaseRepository().create_team(user_id=auth_user.user_id, name=payload.name, domain=payload.domain)
+        row = SupabaseRepository().create_team(
+            user_id=auth_user.user_id,
+            name=payload.name.strip(),
+            domain=payload.domain.strip() if isinstance(payload.domain, str) else None,
+            collaboration_rule=_normalize_collaboration_rule(payload.collaboration_rule),
+        )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     except Exception as error:
@@ -137,6 +212,8 @@ async def patch_team(team_id: str, payload: TeamPatchRequest, auth_user: AuthUse
     updates = payload.model_dump(exclude_unset=True)
     if not updates:
         raise HTTPException(status_code=400, detail="At least one field is required")
+    if "collaboration_rule" in updates:
+        updates["collaboration_rule"] = _normalize_collaboration_rule(str(updates["collaboration_rule"]))
 
     repository = SupabaseRepository()
     _ensure_owned_team(repository=repository, user_id=auth_user.user_id, team_id=team_id)
@@ -191,6 +268,9 @@ async def create_agent(team_id: str, payload: AgentCreateRequest, auth_user: Aut
     except ModelValidationError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
+    if selection.provider == "lmstudio" and not (payload.provider_base_url or "").strip():
+        raise HTTPException(status_code=400, detail="LM Studio provider requires provider_base_url")
+
     try:
         row = repository.create_agent(
             user_id=auth_user.user_id,
@@ -200,6 +280,8 @@ async def create_agent(team_id: str, payload: AgentCreateRequest, auth_user: Aut
             system_prompt=payload.system_prompt,
             model_provider=selection.provider,
             model_name=selection.model_name,
+            provider_base_url=(payload.provider_base_url or "").strip() or None,
+            provider_passcode=payload.provider_passcode,
             response_style=payload.response_style or "balanced",
             execution_order=payload.execution_order,
         )
@@ -233,6 +315,15 @@ async def patch_agent(team_id: str, agent_id: str, payload: AgentPatchRequest, a
             raise HTTPException(status_code=400, detail=str(error)) from error
         updates["model_provider"] = selection.provider
         updates["model_name"] = selection.model_name
+    else:
+        selection = validate_model_selection(
+            provider=str(current.get("model_provider", "")),
+            model_name=str(current.get("model_name", "")),
+        )
+
+    next_base_url = updates.get("provider_base_url", current.get("provider_base_url"))
+    if selection.provider == "lmstudio" and not str(next_base_url or "").strip():
+        raise HTTPException(status_code=400, detail="LM Studio provider requires provider_base_url")
 
     try:
         row = repository.update_agent(user_id=auth_user.user_id, team_id=team_id, agent_id=agent_id, **updates)

@@ -6,12 +6,44 @@ export type Source = {
   score: number;
 };
 
+export type Citation = {
+  document_id: string;
+  filename: string;
+  chunk_index: number;
+  source_index: number;
+};
+
+export type AgentTrace = {
+  id: string | null;
+  agent_id: string | null;
+  agent_name: string;
+  agent_role: string;
+  model_provider: string;
+  model_name: string;
+  status: string;
+  latency_ms: number | null;
+  output: string;
+  error: string | null;
+  citations: Record<string, unknown>[];
+};
+
+export type QueryScorecard = {
+  overall_quality: number | null;
+  citation_accuracy: number | null;
+  insight_depth: number | null;
+  model_contribution_breakdown: Record<string, unknown>;
+  notes: string | null;
+};
+
 export type QueryResponse = {
   query_id: string | null;
   query: string;
   final_answer: string;
   reasoning?: string | null;
   sources: Source[];
+  citations: Citation[];
+  traces: AgentTrace[];
+  scorecard: QueryScorecard | null;
   retrieval_count: number;
   insufficient_context: boolean;
   model_version: string;
@@ -56,4 +88,36 @@ export type SessionRecord = {
 export type DocumentDownloadResponse = {
   url: string;
   expires_in_seconds: number;
+};
+
+export type CollaborationRule = "sequential" | "debate" | "hierarchical";
+
+export type Team = {
+  id: string;
+  user_id: string;
+  name: string;
+  domain: string | null;
+  collaboration_rule: CollaborationRule;
+  created_at: string;
+};
+
+export type Agent = {
+  id: string;
+  team_id: string;
+  name: string;
+  role: string;
+  system_prompt: string;
+  model_provider: "groq" | "sarvam" | "lmstudio" | string;
+  model_name: string;
+  provider_base_url: string | null;
+  provider_passcode_configured: boolean;
+  response_style: string | null;
+  execution_order: number;
+  created_at: string;
+};
+
+export type ProviderModels = {
+  groq: string[];
+  sarvam: string[];
+  lmstudio: string[];
 };

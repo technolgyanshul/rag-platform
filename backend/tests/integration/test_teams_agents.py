@@ -15,7 +15,10 @@ def _client() -> httpx.AsyncClient:
 
 async def _create_team(name: str = "Research Demo Team", domain: str = "AI safety") -> dict:
     async with _client() as client:
-        response = await client.post("/teams", json={"name": name, "domain": domain})
+        response = await client.post(
+            "/teams",
+            json={"name": name, "domain": domain, "collaboration_rule": "sequential"},
+        )
     assert response.status_code == 200
     return response.json()
 
@@ -24,6 +27,7 @@ async def test_team_creation_and_openapi_paths() -> None:
     team = await _create_team()
     assert team["id"]
     assert team["name"] == "Research Demo Team"
+    assert team["collaboration_rule"] == "sequential"
 
     async with _client() as client:
         teams_response = await client.get("/teams")
@@ -65,8 +69,8 @@ async def test_multiple_agents_with_different_models_and_patch_flow() -> None:
                 "name": "Local Critic",
                 "role": "critic",
                 "system_prompt": "Challenge unsupported claims.",
-                "model_provider": "ollama",
-                "model_name": "mistral:7b",
+                "model_provider": "sarvam",
+                "model_name": "sarvam-m",
                 "response_style": "skeptical",
                 "execution_order": 4,
             },
@@ -80,7 +84,7 @@ async def test_multiple_agents_with_different_models_and_patch_flow() -> None:
     agents = list_response.json()
     assert len(agents) == 5
     assert any(a["name"] == "Researcher Plus" and a["model_provider"] == "groq" for a in agents)
-    assert any(a["name"] == "Local Critic" and a["model_name"] == "mistral:7b" for a in agents)
+    assert any(a["name"] == "Local Critic" and a["model_name"] == "sarvam-m" for a in agents)
 
     patch_target = create_b.json()["id"]
     async with _client() as client:
@@ -90,7 +94,7 @@ async def test_multiple_agents_with_different_models_and_patch_flow() -> None:
         )
         patch_team_response = await client.patch(
             f"/teams/{team_id}",
-            json={"name": "Updated Team", "domain": "Policy"},
+            json={"name": "Updated Team", "domain": "Policy", "collaboration_rule": "debate"},
         )
 
     assert patch_response.status_code == 200
@@ -102,6 +106,7 @@ async def test_multiple_agents_with_different_models_and_patch_flow() -> None:
     patched_team = patch_team_response.json()
     assert patched_team["name"] == "Updated Team"
     assert patched_team["domain"] == "Policy"
+    assert patched_team["collaboration_rule"] == "debate"
 
 
 async def test_invalid_provider_and_model_rejected() -> None:
@@ -124,7 +129,7 @@ async def test_invalid_provider_and_model_rejected() -> None:
                 "name": "Bad Model",
                 "role": "researcher",
                 "system_prompt": "x",
-                "model_provider": "ollama",
+                "model_provider": "groq",
                 "model_name": "invalid-model",
             },
         )
@@ -132,7 +137,42 @@ async def test_invalid_provider_and_model_rejected() -> None:
     assert bad_provider.status_code == 400
     assert "Unsupported model provider" in bad_provider.json()["detail"]
     assert bad_model.status_code == 400
-    assert "Unsupported model for ollama" in bad_model.json()["detail"]
+    assert "Unsupported model for groq" in bad_model.json()["detail"]
+
+
+async def test_lmstudio_requires_base_url_and_allows_custom_model_name() -> None:
+    team = await _create_team()
+    async with _client() as client:
+        missing_url = await client.post(
+            f"/teams/{team['id']}/agents",
+            json={
+                "name": "Local Agent",
+                "role": "researcher",
+                "system_prompt": "Use local runtime",
+                "model_provider": "lmstudio",
+                "model_name": "phi-3-mini",
+            },
+        )
+        valid = await client.post(
+            f"/teams/{team['id']}/agents",
+            json={
+                "name": "Local Agent",
+                "role": "researcher",
+                "system_prompt": "Use local runtime",
+                "model_provider": "lmstudio",
+                "model_name": "phi-3-mini",
+                "provider_base_url": "http://localhost:1234/v1",
+                "provider_passcode": "secret-pass",
+            },
+        )
+    assert missing_url.status_code == 400
+    assert "requires provider_base_url" in missing_url.json()["detail"]
+    assert valid.status_code == 200
+    payload = valid.json()
+    assert payload["model_provider"] == "lmstudio"
+    assert payload["model_name"] == "phi-3-mini"
+    assert payload["provider_base_url"] == "http://localhost:1234/v1"
+    assert payload["provider_passcode_configured"] is True
 
 
 async def test_cross_user_team_forbidden() -> None:

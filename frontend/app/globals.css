@@ -77,6 +77,14 @@ button:disabled {
   transform: none;
 }
 
+.button-danger {
+  background: var(--danger);
+}
+
+.button-danger:hover {
+  box-shadow: 0 8px 16px rgba(185, 28, 28, 0.25);
+}
+
 input,
 textarea,
 select {
@@ -257,6 +265,51 @@ select:focus {
 
 .shell-main {
   min-width: 0;
+}
+
+.teams-layout {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 16px;
+}
+
+.team-list-item {
+  display: grid;
+  width: 100%;
+  text-align: left;
+  justify-items: start;
+  gap: 4px;
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
+.team-list-item small {
+  color: var(--muted);
+}
+
+.team-list-item.is-active {
+  outline: 2px solid rgba(37, 99, 235, 0.2);
+  background: var(--accent-soft);
+}
+
+.teams-agents-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 16px;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 1024px) {
+  .teams-layout,
+  .teams-agents-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .top-bar {

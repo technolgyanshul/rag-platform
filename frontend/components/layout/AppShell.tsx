@@ -14,6 +14,7 @@ type AppShellProps = {
 };
 
 const navItems: NavItem[] = [
+  { href: "/teams", label: "Teams", icon: "groups" },
   { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
   { href: "/knowledge", label: "Knowledge Base", icon: "database" },
   { href: "/chat", label: "Chat Workspace", icon: "forum" },
