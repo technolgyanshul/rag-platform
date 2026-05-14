@@ -3,12 +3,16 @@ import { AgentTrace, Source } from "../../lib/types";
 type TracePanelProps = Readonly<{
   traces: readonly AgentTrace[];
   sources: readonly Source[];
+  fullOutput?: boolean;
 }>;
 
-function outputPreview(output: string): string {
+function outputPreview(output: string, fullOutput: boolean): string {
   const trimmed = output.trim();
   if (!trimmed) {
     return "No output captured.";
+  }
+  if (fullOutput) {
+    return trimmed;
   }
   return trimmed.length > 240 ? `${trimmed.slice(0, 240)}...` : trimmed;
 }
@@ -46,7 +50,7 @@ function citationLabel(citation: Record<string, unknown>, sources: readonly Sour
   return "Citation";
 }
 
-export function TracePanel({ traces, sources }: TracePanelProps) {
+export function TracePanel({ traces, sources, fullOutput = false }: TracePanelProps) {
   if (traces.length === 0) {
     return <p className="status-message">No agent traces returned for this answer.</p>;
   }
@@ -76,7 +80,7 @@ export function TracePanel({ traces, sources }: TracePanelProps) {
               <dd>{trace.latency_ms === null ? "not recorded" : `${trace.latency_ms} ms`}</dd>
             </div>
           </dl>
-          <p className="trace-item__output">{outputPreview(trace.error ?? trace.output)}</p>
+          <p className="trace-item__output">{outputPreview(trace.error ?? trace.output, fullOutput)}</p>
           {trace.citations.length > 0 ? (
             <div className="trace-item__citations">
               {trace.citations.map((citation, citationIndex) => (

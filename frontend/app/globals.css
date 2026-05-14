@@ -561,9 +561,93 @@ select:focus {
   padding: 12px;
 }
 
+.history-link {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.history-pre {
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+}
+
 .score-grid {
   display: grid;
   gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.scorecard {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  padding: 12px;
+}
+
+.scorecard__header {
+  display: grid;
+  gap: 4px;
+}
+
+.scorecard__header h4,
+.scorecard__breakdown h5 {
+  color: var(--muted);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.scorecard__metric,
+.scorecard__row {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  padding: 9px 10px;
+}
+
+.scorecard__metric {
+  display: grid;
+  gap: 4px;
+}
+
+.scorecard__metric span,
+.scorecard__row span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.scorecard__metric strong {
+  font-size: 1.2rem;
+}
+
+.scorecard__breakdown {
+  display: grid;
+  gap: 8px;
+}
+
+.scorecard__rows {
+  display: grid;
+  gap: 6px;
+}
+
+.scorecard__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.scorecard__row strong {
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
 .chat-layout {

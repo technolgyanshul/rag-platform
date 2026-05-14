@@ -4,6 +4,8 @@ import time
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from rag.scorecard import evaluate_scorecard
+
 
 @dataclass(frozen=True)
 class QueryContext:
@@ -111,18 +113,6 @@ def package_citations(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return citations
 
 
-def build_scorecard(traces: list[AgentStepTrace]) -> dict[str, Any]:
-    failed = any(trace.status == "failed" for trace in traces)
-    baseline = 3 if failed else 7
-    return {
-        "overall_quality": baseline,
-        "citation_accuracy": baseline,
-        "insight_depth": baseline,
-        "model_contribution_breakdown": {trace.agent_name: trace.status for trace in traces},
-        "notes": "MVP deterministic scorecard.",
-    }
-
-
 def normalize_agent_error(agent: dict[str, Any], provider: str, model: str, error: BaseException) -> str:
     name = str(agent.get("name") or "Agent")
     return f"{name} failed using provider {provider} and model {model}: {error}"
@@ -200,7 +190,14 @@ class Orchestrator:
             )
             raise
 
-        scorecard = build_scorecard(traces)
+        citations = package_citations(retrieved_context)
+        scorecard = evaluate_scorecard(
+            final_answer=final_answer,
+            sources=retrieved_context,
+            citations=citations,
+            traces=traces,
+            retrieval_metadata={"source_count": len(retrieved_context)},
+        )
         self.repository.save_scorecard(
             user_id=query_context.user_id,
             session_id=query_context.session_id,
@@ -217,7 +214,7 @@ class Orchestrator:
         return OrchestrationResult(
             final_answer=final_answer,
             traces=traces,
-            citations=package_citations(retrieved_context),
+            citations=citations,
             scorecard=scorecard,
             collaboration_rule=rule,
         )

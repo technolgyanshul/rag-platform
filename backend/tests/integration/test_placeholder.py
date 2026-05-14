@@ -69,6 +69,7 @@ async def test_query_returns_top_k_sources(monkeypatch) -> None:
 
 async def test_query_returns_insufficient_context_when_no_hits(monkeypatch) -> None:
     monkeypatch.setattr(query_router, "retrieve_chunks", lambda query, user_id, top_k: [])
+    team_id = _team_id()
 
     async with _client() as client:
         response = await client.post(
@@ -76,7 +77,7 @@ async def test_query_returns_insufficient_context_when_no_hits(monkeypatch) -> N
             json={
                 "query": "unknown",
                 "session_id": "88888888-8888-8888-8888-888888888888",
-                "team_id": _team_id(),
+                "team_id": team_id,
                 "top_k": 3,
             },
         )
@@ -87,3 +88,29 @@ async def test_query_returns_insufficient_context_when_no_hits(monkeypatch) -> N
     assert payload["insufficient_context"] is True
     assert payload["retrieval_count"] == 0
     assert payload["sources"] == []
+    assert payload["scorecard"]["overall_quality"] == 5
+    assert payload["scorecard"]["citation_accuracy"] == 2
+    assert isinstance(payload["scorecard"]["insight_depth"], int)
+
+    repository = SupabaseRepository()
+    stored_queries = repository.list_queries(
+        user_id="00000000-0000-0000-0000-000000000001",
+        session_id="88888888-8888-8888-8888-888888888888",
+        limit=10,
+    )
+    stored_query = next(row for row in stored_queries if row["id"] == payload["query_id"])
+    assert stored_query["overall_score"] == payload["scorecard"]["overall_quality"]
+    assert stored_query["citation_accuracy"] == payload["scorecard"]["citation_accuracy"]
+    assert stored_query["insight_depth"] == payload["scorecard"]["insight_depth"]
+
+    scorecards = repository.list_scorecards(
+        user_id="00000000-0000-0000-0000-000000000001",
+        session_id="88888888-8888-8888-8888-888888888888",
+    )
+    stored_scorecard = next(row for row in scorecards if row["query_id"] == payload["query_id"])
+    assert stored_scorecard["overall_quality"] == payload["scorecard"]["overall_quality"]
+    assert stored_scorecard["citation_accuracy"] == payload["scorecard"]["citation_accuracy"]
+    assert stored_scorecard["insight_depth"] == payload["scorecard"]["insight_depth"]
+    assert isinstance(stored_scorecard["overall_quality"], int)
+    assert isinstance(stored_scorecard["citation_accuracy"], int)
+    assert isinstance(stored_scorecard["insight_depth"], int)

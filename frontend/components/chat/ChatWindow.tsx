@@ -1,4 +1,5 @@
 import { QueryUiState } from "../../lib/types";
+import { ScoreCard } from "./ScoreCard";
 
 type ChatWindowProps = Readonly<{
   queryState: QueryUiState;
@@ -31,6 +32,7 @@ export function ChatWindow({ queryState }: ChatWindowProps) {
         <h4>Final Answer</h4>
         <p>{response.final_answer}</p>
       </div>
+      {response.scorecard ? <ScoreCard scorecard={response.scorecard} /> : null}
       <p className="status-message">
         Retrieval count: {response.retrieval_count} | Insufficient context: {response.insufficient_context ? "yes" : "no"}
       </p>

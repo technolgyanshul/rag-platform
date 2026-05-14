@@ -3,9 +3,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApiRequestError,
   createSession,
+  downloadSessionExport,
   getDocumentDownloadUrl,
+  getSessionDetail,
   listKnowledgeDocuments,
   listRecentQueryHistory,
+  listSessions,
   logUiEvent,
   runQuery,
   uploadKnowledgeFile,
@@ -99,6 +102,171 @@ describe("listRecentQueryHistory", () => {
   });
 });
 
+describe("listSessions", () => {
+  it("loads session list with auth headers", async () => {
+    const mockResponse = [
+      {
+        id: "session-1",
+        team_id: "team-1",
+        team_name: "Research Team",
+        title: "Chat session",
+        created_at: "2026-05-14T00:00:00Z",
+        query_count: 2,
+        last_query_at: "2026-05-14T00:01:00Z",
+      },
+    ];
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(mockResponse),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await listSessions();
+
+    expect(result).toEqual(mockResponse);
+    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/sessions", {
+      headers: {
+        Authorization: "Bearer test-token",
+      },
+    });
+  });
+});
+
+describe("getSessionDetail", () => {
+  it("loads a session detail payload", async () => {
+    const mockResponse = {
+      session: {
+        id: "session-1",
+        team_id: "team-1",
+        team_name: "Research Team",
+        title: "Chat session",
+        created_at: "2026-05-14T00:00:00Z",
+      },
+      messages: [],
+      queries: [],
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(mockResponse),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await getSessionDetail("session-1");
+
+    expect(result).toEqual(mockResponse);
+    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/sessions/session-1", {
+      headers: {
+        Authorization: "Bearer test-token",
+      },
+    });
+  });
+
+  it("preserves query scorecard fields for history detail rendering", async () => {
+    const mockResponse = {
+      session: {
+        id: "session-1",
+        team_id: "team-1",
+        team_name: "Research Team",
+        title: "Chat session",
+        created_at: "2026-05-14T00:00:00Z",
+      },
+      messages: [],
+      queries: [
+        {
+          id: "query-1",
+          session_id: "session-1",
+          query_text: "What changed?",
+          final_answer: "A grounded final answer.",
+          overall_score: 8,
+          citation_accuracy: 9,
+          insight_depth: 7,
+          response_time_ms: 420,
+          created_at: "2026-05-14T00:02:00Z",
+          sources: [],
+          citations: [],
+          retrieval_metadata: {
+            embedding_model_version: "test-embedding",
+            index_version: "test-index",
+            top_k: 5,
+          },
+          scorecard: {
+            overall_quality: 8,
+            citation_accuracy: 9,
+            insight_depth: 7,
+            notes: "History detail scorecard fixture",
+            model_contribution_breakdown: {
+              Researcher: "completed",
+              Critic: "completed",
+              Synthesizer: "completed",
+            },
+          },
+          agent_traces: [],
+        },
+      ],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(mockResponse),
+      }),
+    );
+
+    const result = await getSessionDetail("session-1");
+
+    expect(result.queries).toHaveLength(1);
+    expect(result.queries[0]?.scorecard).toEqual(mockResponse.queries[0].scorecard);
+    expect(result.queries[0]?.scorecard?.model_contribution_breakdown).toMatchObject({
+      Researcher: "completed",
+      Critic: "completed",
+      Synthesizer: "completed",
+    });
+  });
+});
+
+describe("downloadSessionExport", () => {
+  it("loads and returns export payload plus filename from headers", async () => {
+    const mockResponse = {
+      exported_at: "2026-05-14T00:10:00Z",
+      schema_version: "session-export-v1",
+      session: {
+        id: "session-1",
+        team_id: "team-1",
+        team_name: "Research Team",
+        title: "Chat session",
+        created_at: "2026-05-14T00:00:00Z",
+      },
+      messages: [],
+      queries: [],
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: {
+        get: vi.fn().mockImplementation((name: string) => {
+          if (name.toLowerCase() === "content-disposition") {
+            return 'attachment; filename="session-session-1.json"';
+          }
+          return null;
+        }),
+      },
+      json: vi.fn().mockResolvedValue(mockResponse),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await downloadSessionExport("session-1");
+
+    expect(result).toEqual({
+      filename: "session-session-1.json",
+      data: mockResponse,
+    });
+    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/sessions/session-1/export.json", {
+      headers: {
+        Authorization: "Bearer test-token",
+      },
+    });
+  });
+});
+
 describe("getDocumentDownloadUrl", () => {
   it("returns signed URL and sends Authorization header", async () => {
     const mockResponse = {
@@ -186,7 +354,17 @@ describe("runQuery", () => {
       sources: [],
       citations: [],
       traces: [],
-      scorecard: null,
+      scorecard: {
+        overall_quality: 8,
+        citation_accuracy: 9,
+        insight_depth: 7,
+        notes: "Deterministic scorecard fixture.",
+        model_contribution_breakdown: {
+          Researcher: "completed",
+          Critic: "completed",
+          Synthesizer: "completed",
+        },
+      },
       retrieval_count: 0,
       insufficient_context: false,
       model_version: "test-model",

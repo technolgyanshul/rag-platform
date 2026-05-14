@@ -5,6 +5,9 @@ import {
   DocumentDownloadResponse,
   QueryHistoryItem,
   QueryResponse,
+  SessionDetail,
+  SessionExport,
+  SessionListItem,
   SessionRecord,
   Team,
   ProviderModels,
@@ -197,6 +200,64 @@ export async function listRecentQueryHistory(limit = 50): Promise<QueryHistoryIt
     throw new Error("Could not load recent history");
   }
   return response.json();
+}
+
+export async function listSessions(): Promise<SessionListItem[]> {
+  const response = await fetch(`${API_BASE_URL}/sessions`, {
+    headers: await buildAuthHeaders(),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.detail ?? "Could not load sessions");
+  }
+  return response.json();
+}
+
+export async function getSessionDetail(sessionId: string): Promise<SessionDetail> {
+  const response = await fetch(`${API_BASE_URL}/sessions/${encodeURIComponent(sessionId)}`, {
+    headers: await buildAuthHeaders(),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.detail ?? "Could not load session detail");
+  }
+  return response.json();
+}
+
+function exportFilenameFromDisposition(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const utf8Match = /filename\*=UTF-8''([^;]+)/i.exec(value);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return utf8Match[1];
+    }
+  }
+
+  const filenameMatch = /filename=\"?([^\";]+)\"?/i.exec(value);
+  return filenameMatch?.[1] ?? null;
+}
+
+export async function downloadSessionExport(sessionId: string): Promise<{ filename: string; data: SessionExport }> {
+  const response = await fetch(`${API_BASE_URL}/sessions/${encodeURIComponent(sessionId)}/export.json`, {
+    headers: await buildAuthHeaders(),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.detail ?? "Could not export session");
+  }
+
+  const data = await response.json();
+  const filename = exportFilenameFromDisposition(response.headers.get("content-disposition"))
+    ?? `session-${sessionId}.json`;
+  return {
+    filename,
+    data,
+  };
 }
 
 export async function getDashboardMetrics(sessionId: string, days = 7): Promise<DashboardMetrics> {

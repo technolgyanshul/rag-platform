@@ -1,136 +1,102 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import { ProtectedPage } from "../../components/auth/ProtectedPage";
 import { AppShell } from "../../components/layout/AppShell";
-import { listQueryHistory, listRecentQueryHistory, logUiEvent } from "../../lib/api";
-import { QueryHistoryItem } from "../../lib/types";
+import { listSessions, logUiEvent } from "../../lib/api";
+import { SessionListItem } from "../../lib/types";
 
 export default function HistoryPage() {
-  const [sessionId, setSessionId] = useState("");
-  const [rows, setRows] = useState<QueryHistoryItem[]>([]);
-  const [message, setMessage] = useState("Loading recent query history...");
-  const [mode, setMode] = useState<"recent" | "session">("recent");
+  const [sessions, setSessions] = useState<SessionListItem[]>([]);
+  const [message, setMessage] = useState("Loading sessions...");
+  const [loading, setLoading] = useState(true);
 
-  const loadRecentHistory = async () => {
+  const loadSessions = async () => {
+    setLoading(true);
     try {
-      const result = await listRecentQueryHistory();
+      const result = await listSessions();
       await logUiEvent({
-        event_name: "query_history_recent_success",
+        event_name: "history_sessions_success",
         page: "/history",
         component: "HistoryPage",
-        action: "load_recent_history",
-        payload: { row_count: result.length, rows: result },
+        action: "load_sessions",
+        payload: { session_count: result.length },
       }).catch(() => undefined);
-      setRows(result);
-      setMode("recent");
-      setMessage(result.length ? "" : "No recent queries found.");
+      setSessions(result);
+      setMessage(result.length ? "" : "No sessions found yet.");
     } catch (error) {
       await logUiEvent({
-        event_name: "query_history_recent_failure",
+        event_name: "history_sessions_failure",
         page: "/history",
         component: "HistoryPage",
-        action: "load_recent_history",
+        action: "load_sessions",
         payload: { error: error instanceof Error ? error.message : String(error) },
       }).catch(() => undefined);
-      setRows([]);
-      setMessage(error instanceof Error ? error.message : "Could not load recent history.");
+      setSessions([]);
+      setMessage(error instanceof Error ? error.message : "Could not load sessions.");
+    } finally {
+      setLoading(false);
     }
   };
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     void logUiEvent({ event_name: "page_view", page: "/history", component: "HistoryPage", action: "load" }).catch(() => undefined);
-    void loadRecentHistory();
+    void loadSessions();
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const handleLoad = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!sessionId.trim()) {
-      void loadRecentHistory();
-      return;
-    }
-    try {
-      const result = await listQueryHistory(sessionId.trim());
-      await logUiEvent({
-        event_name: "query_history_success",
-        page: "/history",
-        component: "HistoryPage",
-        action: "load_history",
-        payload: { session_id: sessionId.trim(), row_count: result.length, rows: result },
-      }).catch(() => undefined);
-      setRows(result);
-      setMode("session");
-      setMessage(result.length ? "" : "No history found for this session.");
-    } catch (error) {
-      await logUiEvent({
-        event_name: "query_history_failure",
-        page: "/history",
-        component: "HistoryPage",
-        action: "load_history",
-        payload: { session_id: sessionId.trim(), error: error instanceof Error ? error.message : String(error) },
-      }).catch(() => undefined);
-      setRows([]);
-      setMessage(error instanceof Error ? error.message : "Could not load history.");
-    }
-  };
-
   return (
     <ProtectedPage>
-      <AppShell title="Query Logs" subtitle="Audit previous prompts, answers, scores, and latency">
+      <AppShell title="Session History" subtitle="Open any previous session and inspect full outputs and traces">
         <div className="card">
-          <form className="split-2" onSubmit={handleLoad}>
-            <label htmlFor="history-session-id">
-              Session ID
-              <input
-                id="history-session-id"
-                value={sessionId}
-                onChange={(event) => setSessionId(event.target.value)}
-                placeholder="Session UUID (optional)"
-              />
-            </label>
-            <div style={{ display: "grid", alignItems: "end" }}>
-              <button type="submit">{sessionId.trim() ? "Load Session History" : "Load Recent History"}</button>
-            </div>
-          </form>
+          <div className="page-header__actions">
+            <button type="button" onClick={() => void loadSessions()} disabled={loading}>
+              {loading ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
         </div>
 
         <div className="card">
-          <h3 style={{ marginBottom: 12 }}>
-            {mode === "recent" ? "Past Queries (Recent Across Sessions)" : "Past Queries (Session Filtered)"}
-          </h3>
-          {!rows.length ? (
+          <h3 style={{ marginBottom: 12 }}>Your Sessions</h3>
+          {sessions.length === 0 ? (
             <p className="status-message">{message}</p>
           ) : (
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Session ID</th>
-                    <th>Query</th>
-                    <th>Answer Preview</th>
-                    <th>Score</th>
-                    <th>Latency</th>
-                    <th>Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row: QueryHistoryItem) => (
-                    <tr key={row.id}>
-                      <td>{row.session_id}</td>
-                      <td>{row.query_text}</td>
-                      <td>{row.final_answer.slice(0, 140)}...</td>
-                      <td>{row.overall_score ?? "N/A"}</td>
-                      <td>{row.response_time_ms != null ? `${row.response_time_ms} ms` : "N/A"}</td>
-                      <td>{new Date(row.created_at).toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ul className="history-list">
+              {sessions.map((session) => (
+                <li key={session.id} className="history-item">
+                  <div style={{ display: "grid", gap: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                      <strong>{session.title || "Chat session"}</strong>
+                      <span className="status-message">
+                        {session.query_count} quer{session.query_count === 1 ? "y" : "ies"}
+                      </span>
+                    </div>
+                    <p className="status-message">
+                      Team: {session.team_name || "Unknown"} | Created: {new Date(session.created_at).toLocaleString()}
+                    </p>
+                    <p className="status-message">
+                      Last Query: {session.last_query_at ? new Date(session.last_query_at).toLocaleString() : "No queries yet"}
+                    </p>
+                    <div>
+                      <Link href={`/history/${session.id}`} className="history-link">
+                        Open Session
+                      </Link>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
+          {!sessions.length && message ? (
+            <div style={{ marginTop: 12 }}>
+              <button type="button" onClick={() => void loadSessions()} disabled={loading}>
+                Try Again
+              </button>
+            </div>
+          ) : null}
         </div>
       </AppShell>
     </ProtectedPage>

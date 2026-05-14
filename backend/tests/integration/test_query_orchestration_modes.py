@@ -111,7 +111,10 @@ async def test_query_runs_rule_aware_orchestration_and_returns_traces(rule: str,
     assert payload["final_answer"].endswith("output")
     assert payload["sources"][0]["document_id"] == "doc-1"
     assert payload["citations"] == [{"document_id": "doc-1", "filename": "policy.txt", "chunk_index": 0, "source_index": 1}]
-    assert payload["scorecard"]["overall_quality"] == 7
+    assert payload["scorecard"]["overall_quality"] == 8
+    assert payload["scorecard"]["citation_accuracy"] == 8
+    assert payload["scorecard"]["insight_depth"] == 8
+    assert payload["scorecard"]["model_contribution_breakdown"]["Researcher"]["model_name"] == "llama-3.1-8b-instant"
     assert payload["traces"]
     assert all(trace["model_provider"] == "groq" for trace in payload["traces"])
     assert all(trace["model_name"] == "llama-3.1-8b-instant" for trace in payload["traces"])
@@ -120,3 +123,20 @@ async def test_query_runs_rule_aware_orchestration_and_returns_traces(rule: str,
     assert len(persisted) == len(payload["traces"])
     assert [call["model_name"] for call in fake_llm.calls] == ["llama-3.1-8b-instant"] * len(fake_llm.calls)
     assert [call["team_id"] for call in fake_llm.calls] == [team_id] * len(fake_llm.calls)
+
+    stored_queries = repository.list_queries(user_id=USER_ID, session_id=session_id, limit=10)
+    stored_query = next(row for row in stored_queries if row["id"] == payload["query_id"])
+    assert stored_query["final_answer"] == payload["final_answer"]
+    assert stored_query["sources"] == payload["sources"]
+    assert stored_query["citations"] == payload["citations"]
+    assert stored_query["retrieval_metadata"]["top_k"] == 1
+    assert stored_query["model_version"]
+    assert stored_query["insufficient_context"] is False
+    assert stored_query["overall_score"] == payload["scorecard"]["overall_quality"]
+    assert stored_query["citation_accuracy"] == payload["scorecard"]["citation_accuracy"]
+    assert stored_query["insight_depth"] == payload["scorecard"]["insight_depth"]
+
+    scorecards = repository.list_scorecards(user_id=USER_ID, session_id=session_id)
+    stored_scorecard = next(row for row in scorecards if row["query_id"] == payload["query_id"])
+    assert stored_scorecard["overall_quality"] == payload["scorecard"]["overall_quality"]
+    assert stored_scorecard["model_contribution_breakdown"] == payload["scorecard"]["model_contribution_breakdown"]

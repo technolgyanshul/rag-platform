@@ -22,6 +22,7 @@ from rag.orchestrator import (
     QueryContext,
 )
 from rag.retriever import format_sources, retrieve_chunks
+from rag.scorecard import evaluate_scorecard
 
 
 QUERY_ROUTE_PREFIX = "/query"
@@ -149,6 +150,16 @@ def _trace_items(result: OrchestrationResult) -> list[AgentTraceItem]:
         )
         for trace in result.traces
     ]
+
+
+def _serialize_json_list(items: list[Any]) -> list[dict[str, Any]]:
+    serialized: list[dict[str, Any]] = []
+    for item in items:
+        if hasattr(item, "model_dump"):
+            serialized.append(item.model_dump())
+        else:
+            serialized.append(dict(item))
+    return serialized
 
 
 @router.post(
@@ -300,13 +311,18 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             "Insufficient context to answer from uploaded documents. "
             "Please upload more relevant files or rephrase the query."
         )
-        scorecard = {
-            "overall_quality": None,
-            "citation_accuracy": None,
-            "insight_depth": None,
-            "model_contribution_breakdown": {},
-            "notes": "Insufficient retrieved context.",
+        retrieval_metadata = {
+            "embedding_model_version": settings.embedanything_model,
+            "index_version": settings.index_version,
+            "top_k": selected_top_k,
         }
+        scorecard = evaluate_scorecard(
+            final_answer=final_answer,
+            sources=[],
+            citations=[],
+            traces=[],
+            retrieval_metadata=retrieval_metadata,
+        )
         total_response_ms = int((time.perf_counter() - query_start) * 1000)
         try:
             query_row = repository.create_query(
@@ -314,6 +330,13 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
                 query_text=payload.query,
                 user_id=auth_user.user_id,
                 response_time_ms=None,
+            )
+            repository.create_message(
+                user_id=auth_user.user_id,
+                session_id=str(payload.session_id),
+                role="user",
+                content=payload.query,
+                metadata={"query_id": query_row["id"]},
             )
             repository.save_scorecard(
                 user_id=auth_user.user_id,
@@ -327,6 +350,18 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
                 final_answer=final_answer,
                 scorecard=scorecard,
                 response_time_ms=total_response_ms,
+                sources=[],
+                citations=[],
+                retrieval_metadata=retrieval_metadata,
+                model_version=settings.model_version,
+                insufficient_context=True,
+            )
+            repository.create_message(
+                user_id=auth_user.user_id,
+                session_id=str(payload.session_id),
+                role="assistant",
+                content=final_answer,
+                metadata={"query_id": query_row["id"]},
             )
             observer.record_trace_event(
                 event_name="query_persistence_finished",
@@ -400,6 +435,13 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             user_id=auth_user.user_id,
             response_time_ms=None,
         )
+        repository.create_message(
+            user_id=auth_user.user_id,
+            session_id=str(payload.session_id),
+            role="user",
+            content=payload.query,
+            metadata={"query_id": query_row["id"]},
+        )
         orchestrator = Orchestrator(
             repository=repository,
             llm_router=LLMRouter(),
@@ -424,6 +466,22 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
             final_answer=final_answer,
             scorecard=result.scorecard,
             response_time_ms=int((time.perf_counter() - query_start) * 1000),
+            sources=_serialize_json_list(sources),
+            citations=_serialize_json_list(result.citations),
+            retrieval_metadata={
+                "embedding_model_version": settings.embedanything_model,
+                "index_version": settings.index_version,
+                "top_k": selected_top_k,
+            },
+            model_version=settings.model_version,
+            insufficient_context=False,
+        )
+        repository.create_message(
+            user_id=auth_user.user_id,
+            session_id=str(payload.session_id),
+            role="assistant",
+            content=final_answer,
+            metadata={"query_id": query_row["id"]},
         )
         observer.record_trace_event(
             event_name="query_persistence_finished",
