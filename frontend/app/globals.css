@@ -654,6 +654,11 @@ select:focus {
   display: grid;
   grid-template-columns: 1.4fr 1fr;
   gap: 16px;
+  align-items: start;
+}
+
+.chat-layout > .stack {
+  align-content: start;
 }
 
 .query-form {
@@ -759,6 +764,12 @@ select:focus {
   color: var(--muted);
   font-size: 0.82rem;
   padding: 4px 8px;
+}
+
+.chat-trace-scroll {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .stack {
