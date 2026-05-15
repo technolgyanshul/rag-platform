@@ -1,3 +1,4 @@
+"""Session endpoints for creation, listing, detail, and export."""
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -17,11 +18,13 @@ logger = logging.getLogger(__name__)
 
 
 class CreateSessionRequest(BaseModel):
+    """Payload for creating a session."""
     title: str | None = Field(default=None, max_length=200)
     team_id: UUID | None = None
 
 
 class SessionResponse(BaseModel):
+    """Minimal session creation response payload."""
     id: str
     team_id: str
     title: str | None = None
@@ -29,6 +32,7 @@ class SessionResponse(BaseModel):
 
 
 class SessionListItem(BaseModel):
+    """Session list row returned by `/sessions`."""
     id: str
     team_id: str
     team_name: str | None = None
@@ -39,6 +43,7 @@ class SessionListItem(BaseModel):
 
 
 class SessionMessageItem(BaseModel):
+    """Serialized chat message attached to a session."""
     id: str
     role: str
     content: str
@@ -47,6 +52,7 @@ class SessionMessageItem(BaseModel):
 
 
 class SessionScorecardItem(BaseModel):
+    """Scorecard metadata associated with one query in a session."""
     id: str
     session_id: str
     query_id: str | None = None
@@ -59,6 +65,7 @@ class SessionScorecardItem(BaseModel):
 
 
 class SessionAgentTraceItem(BaseModel):
+    """Serialized per-agent execution trace for one query."""
     id: str
     session_id: str
     query_id: str | None = None
@@ -77,6 +84,7 @@ class SessionAgentTraceItem(BaseModel):
 
 
 class SessionQueryItem(BaseModel):
+    """Full persisted query record embedded in session detail/export."""
     id: str
     session_id: str
     query_text: str
@@ -96,6 +104,7 @@ class SessionQueryItem(BaseModel):
 
 
 class SessionDetail(BaseModel):
+    """Top-level session metadata for detail/export responses."""
     id: str
     team_id: str
     team_name: str | None = None
@@ -104,12 +113,14 @@ class SessionDetail(BaseModel):
 
 
 class SessionDetailResponse(BaseModel):
+    """Session detail payload with messages and query timeline."""
     session: SessionDetail
     messages: list[SessionMessageItem]
     queries: list[SessionQueryItem]
 
 
 class SessionExportResponse(BaseModel):
+    """Portable JSON export payload shape for a session."""
     exported_at: str
     schema_version: str
     session: SessionDetail
@@ -130,6 +141,7 @@ async def create_session(
     request: Request,
     auth_user: AuthUser = Depends(get_current_user),
 ) -> SessionResponse:
+    """Create a new session for the authenticated user."""
     request_id = getattr(request.state, "request_id", "unknown")
     observer = observability.get_observability()
     try:
@@ -196,6 +208,7 @@ async def list_sessions(
     request: Request,
     auth_user: AuthUser = Depends(get_current_user),
 ) -> list[SessionListItem]:
+    """List sessions for the authenticated user."""
     request_id = getattr(request.state, "request_id", "unknown")
     observer = observability.get_observability()
     try:
@@ -241,6 +254,7 @@ async def export_session_json(
     request: Request,
     auth_user: AuthUser = Depends(get_current_user),
 ) -> JSONResponse:
+    """Export one session as downloadable JSON."""
     request_id = getattr(request.state, "request_id", "unknown")
     observer = observability.get_observability()
     try:
@@ -309,6 +323,7 @@ async def get_session_detail(
     request: Request,
     auth_user: AuthUser = Depends(get_current_user),
 ) -> SessionDetailResponse:
+    """Return full detail for one session."""
     request_id = getattr(request.state, "request_id", "unknown")
     observer = observability.get_observability()
     try:

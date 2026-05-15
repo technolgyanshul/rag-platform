@@ -1,4 +1,5 @@
 from __future__ import annotations
+"""Environment-driven backend configuration with validated defaults."""
 
 import os
 from dataclasses import dataclass
@@ -6,6 +7,7 @@ from functools import lru_cache
 
 
 def _parse_int(name: str, default: int, min_value: int) -> int:
+    """Read an integer environment variable with minimum-bound validation."""
     raw_value = os.getenv(name)
     if raw_value is None:
         return default
@@ -19,6 +21,7 @@ def _parse_int(name: str, default: int, min_value: int) -> int:
 
 
 def _parse_float(name: str, default: float, min_value: float) -> float:
+    """Read a float environment variable with minimum-bound validation."""
     raw_value = os.getenv(name)
     if raw_value is None:
         return default
@@ -32,6 +35,7 @@ def _parse_float(name: str, default: float, min_value: float) -> float:
 
 
 def _parse_bool(name: str, default: bool) -> bool:
+    """Read a truthy/falsey environment variable with a default fallback."""
     raw_value = os.getenv(name)
     if raw_value is None:
         return default
@@ -40,6 +44,7 @@ def _parse_bool(name: str, default: bool) -> bool:
 
 @dataclass(frozen=True)
 class Settings:
+    """Typed runtime configuration consumed across backend modules."""
     log_level: str
     top_k: int
     max_query_length: int
@@ -73,6 +78,7 @@ class Settings:
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
+    """Return cached application settings parsed from environment variables."""
     allowed = {
         file_type.strip().lower()
         for file_type in os.getenv("ALLOWED_FILE_TYPES", "pdf,png,jpg,jpeg,txt").split(",")

@@ -1,4 +1,5 @@
 from __future__ import annotations
+"""Document ingest endpoints for upload, indexing, and retrieval links."""
 
 import logging
 import time
@@ -32,6 +33,7 @@ IDEMPOTENCY_TTL_SECONDS = 60 * 60
 
 
 class IngestResponse(BaseModel):
+    """Result payload for a completed ingest request."""
     document_id: str
     filename: str
     file_type: str
@@ -39,6 +41,7 @@ class IngestResponse(BaseModel):
 
 
 class DocumentListItem(BaseModel):
+    """Document metadata row returned by listing endpoint."""
     id: str
     filename: str
     file_type: str
@@ -52,6 +55,7 @@ class DocumentListItem(BaseModel):
 
 
 class DocumentDownloadResponse(BaseModel):
+    """Signed URL payload for downloading a stored document."""
     url: str
     expires_in_seconds: int
 
@@ -60,6 +64,7 @@ _INGEST_IDEMPOTENCY_CACHE: OrderedDict[str, tuple[float, IngestResponse]] = Orde
 
 
 def _evict_old_idempotency_entries() -> None:
+    """Trim expired and overflow idempotency cache entries."""
     now = time.time()
     keys_to_delete = [key for key, (created_at, _) in _INGEST_IDEMPOTENCY_CACHE.items() if now - created_at > IDEMPOTENCY_TTL_SECONDS]
     for key in keys_to_delete:
@@ -76,6 +81,7 @@ async def ingest(
     file: UploadFile = File(...),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> IngestResponse:
+    """Upload and index a document, then persist its ingest metadata."""
     request_id = getattr(request.state, "request_id", "unknown")
     observer = observability.get_observability()
     ingest_start = time.perf_counter()
@@ -377,6 +383,7 @@ async def list_documents(
     request: Request,
     auth_user: AuthUser = Depends(get_current_user),
 ) -> list[DocumentListItem]:
+    """List documents owned by the authenticated user."""
     request_id = getattr(request.state, "request_id", "unknown")
     observer = observability.get_observability()
     try:
@@ -424,6 +431,7 @@ async def create_document_download_url(
     request: Request,
     auth_user: AuthUser = Depends(get_current_user),
 ) -> DocumentDownloadResponse:
+    """Create a short-lived signed URL for a stored document."""
     request_id = getattr(request.state, "request_id", "unknown")
     observer = observability.get_observability()
     expires_in_seconds = 300
@@ -473,6 +481,7 @@ async def create_document_download_url(
 
 
 def _write_temp_upload(payload: bytes, extension: str) -> str:
+    """Write upload bytes to a temporary file and return its path."""
     with NamedTemporaryFile(delete=False, suffix=f".{extension}") as temp_file:
         temp_file.write(payload)
         return temp_file.name

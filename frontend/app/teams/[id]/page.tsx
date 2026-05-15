@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { ProtectedPage } from "../../../components/auth/ProtectedPage";
@@ -40,7 +40,7 @@ export default function TeamDetailPage() {
 
   const selectedTeam = useMemo(() => teams.find((team) => team.id === teamId) ?? null, [teams, teamId]);
 
-  const loadTeams = async () => {
+  const loadTeams = useCallback(async () => {
     const rows = await listTeams();
     setTeams(rows);
     const current = rows.find((row) => row.id === teamId);
@@ -48,12 +48,12 @@ export default function TeamDetailPage() {
       throw new Error("Team not found");
     }
     setTeamForm({ name: current.name, domain: current.domain ?? "", collaboration_rule: current.collaboration_rule });
-  };
+  }, [teamId]);
 
-  const loadAgents = async () => {
+  const loadAgents = useCallback(async () => {
     const rows = await listTeamAgents(teamId);
     setAgents(rows);
-  };
+  }, [teamId]);
 
   useEffect(() => {
     void (async () => {
@@ -76,7 +76,7 @@ export default function TeamDetailPage() {
         setStatus(error instanceof Error ? error.message : "Could not load team");
       }
     })();
-  }, [teamId]);
+  }, [loadAgents, loadTeams]);
 
   const resetAgentForm = () => {
     setEditingAgentId("");

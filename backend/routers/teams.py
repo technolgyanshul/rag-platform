@@ -1,4 +1,5 @@
 from __future__ import annotations
+"""Team and agent management endpoints, including LM Studio probes."""
 
 from typing import Any
 
@@ -16,43 +17,51 @@ _COLLABORATION_RULES = {"sequential", "debate", "hierarchical"}
 
 
 class ModelsResponse(BaseModel):
+    """Model catalog payload grouped by provider."""
     groq: list[str]
     sarvam: list[str]
     lmstudio: list[str]
 
 
 class LMStudioProbeRequest(BaseModel):
+    """Request payload for LM Studio health/model probe operations."""
     base_url: str = Field(min_length=1, max_length=500)
     passcode: str | None = Field(default=None, max_length=500)
     timeout_seconds: float = Field(default=10, ge=1, le=120)
 
 
 class LMStudioHealthResponse(BaseModel):
+    """Health probe response for LM Studio connectivity."""
     ok: bool
     models_count: int
 
 
 class LMStudioModelsResponse(BaseModel):
+    """Model-list payload returned from LM Studio probe."""
     models: list[str]
 
 
 class AgentDefaultsResponse(BaseModel):
+    """Default agent template list exposed to the UI."""
     agents: list[AgentResponse]
 
 
 class TeamCreateRequest(BaseModel):
+    """Payload for creating a new team."""
     name: str = Field(min_length=1, max_length=120)
     domain: str | None = Field(default=None, max_length=200)
     collaboration_rule: str = Field(default="sequential", min_length=1, max_length=32)
 
 
 class TeamPatchRequest(BaseModel):
+    """Payload for partially updating an existing team."""
     name: str | None = Field(default=None, min_length=1, max_length=120)
     domain: str | None = Field(default=None, max_length=200)
     collaboration_rule: str | None = Field(default=None, min_length=1, max_length=32)
 
 
 class TeamResponse(BaseModel):
+    """Normalized team API response model."""
     id: str
     user_id: str
     name: str
@@ -62,6 +71,7 @@ class TeamResponse(BaseModel):
 
 
 class AgentCreateRequest(BaseModel):
+    """Payload for creating a team agent."""
     name: str = Field(min_length=1, max_length=120)
     role: str = Field(min_length=1, max_length=80)
     system_prompt: str = Field(min_length=1)
@@ -74,6 +84,7 @@ class AgentCreateRequest(BaseModel):
 
 
 class AgentPatchRequest(BaseModel):
+    """Payload for partially updating a team agent."""
     name: str | None = Field(default=None, min_length=1, max_length=120)
     role: str | None = Field(default=None, min_length=1, max_length=80)
     system_prompt: str | None = Field(default=None, min_length=1)
@@ -86,6 +97,7 @@ class AgentPatchRequest(BaseModel):
 
 
 class AgentResponse(BaseModel):
+    """Normalized team-agent API response model."""
     id: str
     team_id: str
     name: str
@@ -101,6 +113,7 @@ class AgentResponse(BaseModel):
 
 
 def _normalize_team_payload(row: dict[str, Any]) -> TeamResponse:
+    """Convert repository team row into response model."""
     return TeamResponse(
         id=str(row.get("id", "")),
         user_id=str(row.get("user_id", "")),
@@ -112,6 +125,7 @@ def _normalize_team_payload(row: dict[str, Any]) -> TeamResponse:
 
 
 def _normalize_agent_payload(row: dict[str, Any]) -> AgentResponse:
+    """Convert repository agent row into response model."""
     return AgentResponse(
         id=str(row.get("id", "")),
         team_id=str(row.get("team_id", "")),
@@ -129,6 +143,7 @@ def _normalize_agent_payload(row: dict[str, Any]) -> AgentResponse:
 
 
 def _ensure_owned_team(repository: SupabaseRepository, user_id: str, team_id: str) -> dict[str, Any]:
+    """Load a team and raise HTTP errors when access is denied or missing."""
     try:
         row = repository.get_team(user_id=user_id, team_id=team_id)
     except PermissionError as error:
@@ -140,6 +155,7 @@ def _ensure_owned_team(repository: SupabaseRepository, user_id: str, team_id: st
 
 
 def _normalize_collaboration_rule(value: str) -> str:
+    """Validate and normalize supported team collaboration rules."""
     normalized = value.strip().lower()
     if normalized not in _COLLABORATION_RULES:
         raise HTTPException(status_code=400, detail="Unsupported collaboration_rule")
@@ -148,6 +164,7 @@ def _normalize_collaboration_rule(value: str) -> str:
 
 @router.get("/models", response_model=ModelsResponse, responses={503: {"description": "Model catalog temporarily unavailable"}})
 async def list_models(_auth_user: AuthUser = Depends(get_current_user)) -> ModelsResponse:
+    """Return available model catalog for supported providers."""
     try:
         catalog = model_catalog()
         return ModelsResponse(**catalog)
@@ -156,6 +173,7 @@ async def list_models(_auth_user: AuthUser = Depends(get_current_user)) -> Model
 
 
 def _lmstudio_http_error(error: LMStudioError) -> HTTPException:
+    """Map LM Studio client categories to HTTP status responses."""
     details = {"category": error.category, "message": error.message}
     if error.category in {"invalid_config", "malformed_response"}:
         return HTTPException(status_code=400, detail=details)
@@ -172,6 +190,7 @@ def _lmstudio_http_error(error: LMStudioError) -> HTTPException:
 
 @router.post("/lmstudio/health", response_model=LMStudioHealthResponse)
 async def lmstudio_health_probe(payload: LMStudioProbeRequest, _auth_user: AuthUser = Depends(get_current_user)) -> LMStudioHealthResponse:
+    """Probe LM Studio health for provided base URL and passcode."""
     try:
         result = LMStudioClient().health(
             base_url=payload.base_url,
@@ -185,6 +204,7 @@ async def lmstudio_health_probe(payload: LMStudioProbeRequest, _auth_user: AuthU
 
 @router.post("/lmstudio/models", response_model=LMStudioModelsResponse)
 async def lmstudio_model_probe(payload: LMStudioProbeRequest, _auth_user: AuthUser = Depends(get_current_user)) -> LMStudioModelsResponse:
+    """Probe and return visible LM Studio model names."""
     try:
         models = LMStudioClient().list_models(
             base_url=payload.base_url,
@@ -202,6 +222,7 @@ async def lmstudio_model_probe(payload: LMStudioProbeRequest, _auth_user: AuthUs
     responses={503: {"description": "Agent defaults temporarily unavailable"}},
 )
 async def list_agent_defaults(_auth_user: AuthUser = Depends(get_current_user)) -> AgentDefaultsResponse:
+    """Return backend-defined default team agent templates."""
     try:
         defaults = default_team_agents()
         rows: list[AgentResponse] = []
@@ -229,6 +250,7 @@ async def list_agent_defaults(_auth_user: AuthUser = Depends(get_current_user)) 
 
 @router.get("", response_model=list[TeamResponse], responses={503: {"description": "Team service temporarily unavailable"}})
 async def list_teams(auth_user: AuthUser = Depends(get_current_user)) -> list[TeamResponse]:
+    """List teams owned by the authenticated user."""
     try:
         rows = SupabaseRepository().list_teams(user_id=auth_user.user_id)
     except Exception as error:
@@ -238,6 +260,7 @@ async def list_teams(auth_user: AuthUser = Depends(get_current_user)) -> list[Te
 
 @router.post("", response_model=TeamResponse, responses={400: {"description": "Validation failed"}, 503: {"description": "Team service temporarily unavailable"}})
 async def create_team(payload: TeamCreateRequest, auth_user: AuthUser = Depends(get_current_user)) -> TeamResponse:
+    """Create a team for the authenticated user."""
     try:
         row = SupabaseRepository().create_team(
             user_id=auth_user.user_id,
@@ -254,6 +277,7 @@ async def create_team(payload: TeamCreateRequest, auth_user: AuthUser = Depends(
 
 @router.get("/{team_id}", response_model=TeamResponse, responses={403: {"description": "Forbidden"}, 404: {"description": "Not found"}, 503: {"description": "Team service temporarily unavailable"}})
 async def get_team(team_id: str, auth_user: AuthUser = Depends(get_current_user)) -> TeamResponse:
+    """Return one owned team by id."""
     repository = SupabaseRepository()
     try:
         row = _ensure_owned_team(repository=repository, user_id=auth_user.user_id, team_id=team_id)
@@ -266,6 +290,7 @@ async def get_team(team_id: str, auth_user: AuthUser = Depends(get_current_user)
 
 @router.patch("/{team_id}", response_model=TeamResponse, responses={400: {"description": "Validation failed"}, 403: {"description": "Forbidden"}, 404: {"description": "Not found"}, 503: {"description": "Team service temporarily unavailable"}})
 async def patch_team(team_id: str, payload: TeamPatchRequest, auth_user: AuthUser = Depends(get_current_user)) -> TeamResponse:
+    """Partially update an owned team."""
     updates = payload.model_dump(exclude_unset=True)
     if not updates:
         raise HTTPException(status_code=400, detail="At least one field is required")
@@ -287,6 +312,7 @@ async def patch_team(team_id: str, payload: TeamPatchRequest, auth_user: AuthUse
 
 @router.delete("/{team_id}", responses={403: {"description": "Forbidden"}, 404: {"description": "Not found"}, 503: {"description": "Team service temporarily unavailable"}})
 async def delete_team(team_id: str, auth_user: AuthUser = Depends(get_current_user)) -> dict[str, bool]:
+    """Delete an owned team."""
     repository = SupabaseRepository()
     _ensure_owned_team(repository=repository, user_id=auth_user.user_id, team_id=team_id)
     try:
@@ -300,6 +326,7 @@ async def delete_team(team_id: str, auth_user: AuthUser = Depends(get_current_us
 
 @router.get("/{team_id}/agents", response_model=list[AgentResponse], responses={403: {"description": "Forbidden"}, 404: {"description": "Not found"}, 503: {"description": "Agent service temporarily unavailable"}})
 async def list_agents(team_id: str, auth_user: AuthUser = Depends(get_current_user)) -> list[AgentResponse]:
+    """List agents configured under an owned team."""
     repository = SupabaseRepository()
     _ensure_owned_team(repository=repository, user_id=auth_user.user_id, team_id=team_id)
     try:
@@ -313,6 +340,7 @@ async def list_agents(team_id: str, auth_user: AuthUser = Depends(get_current_us
 
 @router.post("/{team_id}/agents", response_model=AgentResponse, responses={400: {"description": "Validation failed"}, 403: {"description": "Forbidden"}, 404: {"description": "Not found"}, 503: {"description": "Agent service temporarily unavailable"}})
 async def create_agent(team_id: str, payload: AgentCreateRequest, auth_user: AuthUser = Depends(get_current_user)) -> AgentResponse:
+    """Create an agent under an owned team with validated model selection."""
     repository = SupabaseRepository()
     _ensure_owned_team(repository=repository, user_id=auth_user.user_id, team_id=team_id)
 
@@ -353,6 +381,7 @@ async def create_agent(team_id: str, payload: AgentCreateRequest, auth_user: Aut
 
 @router.patch("/{team_id}/agents/{agent_id}", response_model=AgentResponse, responses={400: {"description": "Validation failed"}, 403: {"description": "Forbidden"}, 404: {"description": "Not found"}, 503: {"description": "Agent service temporarily unavailable"}})
 async def patch_agent(team_id: str, agent_id: str, payload: AgentPatchRequest, auth_user: AuthUser = Depends(get_current_user)) -> AgentResponse:
+    """Partially update an existing agent under an owned team."""
     updates = payload.model_dump(exclude_unset=True)
     if not updates:
         raise HTTPException(status_code=400, detail="At least one field is required")
@@ -395,6 +424,7 @@ async def patch_agent(team_id: str, agent_id: str, payload: AgentPatchRequest, a
 
 @router.delete("/{team_id}/agents/{agent_id}", responses={403: {"description": "Forbidden"}, 404: {"description": "Not found"}, 503: {"description": "Agent service temporarily unavailable"}})
 async def delete_agent(team_id: str, agent_id: str, auth_user: AuthUser = Depends(get_current_user)) -> dict[str, bool]:
+    """Delete an agent from an owned team."""
     repository = SupabaseRepository()
     _ensure_owned_team(repository=repository, user_id=auth_user.user_id, team_id=team_id)
     current = repository.get_agent(user_id=auth_user.user_id, team_id=team_id, agent_id=agent_id)

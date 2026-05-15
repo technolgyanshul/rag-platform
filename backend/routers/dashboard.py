@@ -1,3 +1,4 @@
+"""Dashboard metrics endpoints for session-level analytics."""
 import logging
 from uuid import UUID
 
@@ -16,11 +17,13 @@ DASHBOARD_METRICS_ROUTE = "/dashboard/metrics"
 
 
 class QueriesOverTimePoint(BaseModel):
+    """Daily query-count point used for dashboard trend chart."""
     date: str
     count: int
 
 
 class DashboardMetricsResponse(BaseModel):
+    """Aggregated dashboard metrics response for one session window."""
     total_queries: int
     average_response_time_ms: int
     average_overall_score: float
@@ -41,6 +44,7 @@ async def dashboard_metrics(
     session_id: UUID = Query(...),
     days: int = Query(get_settings().dashboard_days_default, ge=1, le=get_settings().dashboard_days_max),
 ) -> DashboardMetricsResponse:
+    """Return aggregate metrics for a session over a requested day window."""
     request_id = getattr(request.state, "request_id", "unknown")
     observer = observability.get_observability()
     try:

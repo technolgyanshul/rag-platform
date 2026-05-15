@@ -1,4 +1,5 @@
 from __future__ import annotations
+"""Query retrieval over embedded vectors with formatted source projection."""
 
 from typing import Any
 
@@ -9,6 +10,7 @@ from rag.vector_backend import RetrievedChunk
 
 
 def retrieve_chunks(query: str, user_id: str, top_k: int | None = None) -> list[dict[str, Any]]:
+    """Retrieve top-K chunks for a query from the vector backend."""
     settings = get_settings()
     if top_k is None:
         top_k = settings.top_k
@@ -22,6 +24,7 @@ def retrieve_chunks(query: str, user_id: str, top_k: int | None = None) -> list[
 
 
 def format_sources(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Convert retrieved rows into compact source cards for API responses."""
     return [
         {
             "document_id": row.get("document_id", ""),
@@ -35,6 +38,7 @@ def format_sources(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _retrieved_chunk_to_row(chunk: RetrievedChunk) -> dict[str, Any]:
+    """Project a `RetrievedChunk` into the repository row-like structure."""
     return {
         "document_id": chunk.document_id,
         "filename": chunk.filename,

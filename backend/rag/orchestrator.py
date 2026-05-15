@@ -77,6 +77,12 @@ def build_agent_messages(
     previous_outputs: list[dict[str, str]] | None = None,
     instruction: str | None = None,
 ) -> list[dict[str, str]]:
+    """Build the standardized LLM prompt for one agent execution step.
+
+    The user message always contains query + team domain + retrieved context,
+    then conditionally appends previous outputs and orchestration instructions.
+    This stable prompt shape keeps behavior consistent across collaboration modes.
+    """
     role = str(agent.get("role") or "agent")
     name = str(agent.get("name") or role)
     system_prompt = str(agent.get("system_prompt") or f"You are {name}, acting as {role}.")
@@ -147,6 +153,8 @@ def record_orchestration_event(
 
 
 class Orchestrator:
+    """Executes team collaboration flows and persists trace/scorecard artifacts."""
+
     def __init__(self, repository: _Repository, llm_router: _LLMRouter, observer: _Observer | None = None) -> None:
         self.repository = repository
         self.llm_router = llm_router
@@ -159,6 +167,7 @@ class Orchestrator:
         agents: list[dict[str, Any]],
         retrieved_context: list[dict[str, Any]],
     ) -> OrchestrationResult:
+        # Normalize the rule once so downstream branching and telemetry agree on one value.
         rule = str(team.get("collaboration_rule") or "sequential").lower()
         ordered_agents = _sort_agents(agents)
         record_orchestration_event(
@@ -242,6 +251,7 @@ class Orchestrator:
             )
             traces.append(trace)
             previous_outputs.append({"agent_name": trace.agent_name, "agent_role": trace.agent_role, "output": trace.output})
+            # Prefer explicit synthesizer output when present; otherwise fall back to the last agent.
             if trace.agent_role.lower() == "synthesizer":
                 synthesizer_output = trace.output
 
@@ -257,6 +267,7 @@ class Orchestrator:
         if len(agents) < 2:
             raise OrchestrationConfigError("debate requires at least two agents")
 
+        # Resolver adjudicates independent positions; default to tail agent if no explicit role exists.
         resolver = _first_agent_with_role(agents, {"critic", "reviewer", "judge"}) or agents[-1]
         finalizer = _debate_finalizer(agents, resolver)
         phase_a_agents = [agent for agent in agents if agent is not resolver and agent is not finalizer]
@@ -268,6 +279,7 @@ class Orchestrator:
         traces: list[AgentStepTrace] = []
         phase_outputs: list[dict[str, str]] = []
         used_ids: set[int] = set()
+        # Phase A: independent arguments without prior outputs to reduce anchoring bias.
         for current_agent in phase_a_agents:
             trace = self._execute_agent_step(
                 context=context,
@@ -293,6 +305,7 @@ class Orchestrator:
         used_ids.add(id(resolver))
         final_answer = resolver_trace.output
 
+        # Optional final pass only runs when a separate synthesizer is available and unused.
         if finalizer is not None and id(finalizer) not in used_ids:
             finalizer_trace = self._execute_agent_step(
                 context=context,
@@ -317,6 +330,7 @@ class Orchestrator:
         if len(agents) < 2:
             raise OrchestrationConfigError("hierarchical requires at least two agents")
 
+        # Planner decomposes work, workers execute, merger composes final answer.
         planner = _first_agent_with_role(agents, {"planner", "controller", "manager"}) or agents[0]
         merger = _first_separate_agent_with_role(agents, planner, {"synthesizer", "manager", "controller"}) or planner
         workers = [agent for agent in agents if agent is not planner and agent is not merger]
@@ -504,6 +518,7 @@ class Orchestrator:
         status: str,
         error: str | None,
     ) -> AgentStepTrace:
+        # Persist the canonical trace row first, then project it into the typed response object.
         row = self.repository.create_agent_trace(
             user_id=context.user_id,
             session_id=context.session_id,

@@ -1,4 +1,5 @@
 from __future__ import annotations
+"""Query endpoints for retrieval, orchestration, and history access."""
 
 import logging
 import re
@@ -32,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 class QueryRequest(BaseModel):
+    """Inbound payload for running a query within a session/team."""
     query: str = Field(min_length=1, max_length=get_settings().max_query_length)
     session_id: UUID
     team_id: UUID
@@ -39,6 +41,7 @@ class QueryRequest(BaseModel):
 
 
 class SourceItem(BaseModel):
+    """Retrieved source preview returned with query responses."""
     document_id: str
     filename: str
     chunk_index: int
@@ -47,12 +50,14 @@ class SourceItem(BaseModel):
 
 
 class RetrievalMetadata(BaseModel):
+    """Retrieval configuration metadata attached to query responses."""
     embedding_model_version: str
     index_version: str
     top_k: int
 
 
 class CitationItem(BaseModel):
+    """Citation reference to a retrieved source chunk."""
     document_id: str
     filename: str
     chunk_index: int
@@ -60,6 +65,7 @@ class CitationItem(BaseModel):
 
 
 class AgentTraceItem(BaseModel):
+    """Per-agent execution trace included in query responses."""
     id: str | None = None
     agent_id: str | None = None
     agent_name: str
@@ -74,6 +80,7 @@ class AgentTraceItem(BaseModel):
 
 
 class ScorecardResponse(BaseModel):
+    """Deterministic quality scorecard returned for a query."""
     overall_quality: int | None = None
     citation_accuracy: int | None = None
     insight_depth: int | None = None
@@ -82,6 +89,7 @@ class ScorecardResponse(BaseModel):
 
 
 class QueryResponse(BaseModel):
+    """Primary response model for `/query` execution."""
     query_id: str | None = None
     query: str
     final_answer: str
@@ -97,6 +105,7 @@ class QueryResponse(BaseModel):
 
 
 class QueryHistoryItem(BaseModel):
+    """Compact query-history row for list endpoints."""
     id: str
     session_id: str
     query_text: str
@@ -112,6 +121,7 @@ _THINK_TAG_PATTERN = re.compile(r"<think>(.*?)</think>", re.IGNORECASE | re.DOTA
 
 
 def _split_reasoning_and_answer(raw_text: str) -> tuple[str | None, str]:
+    """Split optional `<think>` content from final user-facing answer text."""
     match = _THINK_TAG_PATTERN.search(raw_text or "")
     if not match:
         return None, (raw_text or "").strip()
@@ -124,6 +134,7 @@ def _split_reasoning_and_answer(raw_text: str) -> tuple[str | None, str]:
 
 
 def _scorecard_response(scorecard: dict[str, Any]) -> ScorecardResponse:
+    """Normalize internal scorecard dict into response model."""
     return ScorecardResponse(
         overall_quality=scorecard.get("overall_quality"),
         citation_accuracy=scorecard.get("citation_accuracy"),
@@ -134,6 +145,7 @@ def _scorecard_response(scorecard: dict[str, Any]) -> ScorecardResponse:
 
 
 def _trace_items(result: OrchestrationResult) -> list[AgentTraceItem]:
+    """Project orchestrator traces into API response trace models."""
     return [
         AgentTraceItem(
             id=trace.id,
@@ -153,6 +165,7 @@ def _trace_items(result: OrchestrationResult) -> list[AgentTraceItem]:
 
 
 def _serialize_json_list(items: list[Any]) -> list[dict[str, Any]]:
+    """Serialize mixed Pydantic/dict collections to plain JSON-serializable dicts."""
     serialized: list[dict[str, Any]] = []
     for item in items:
         if hasattr(item, "model_dump"):
@@ -178,6 +191,7 @@ def _serialize_json_list(items: list[Any]) -> list[dict[str, Any]]:
     },
 )
 async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser = Depends(get_current_user)) -> QueryResponse:
+    """Execute retrieval + orchestration and persist a query result."""
     settings = get_settings()
     request_id = getattr(request.state, "request_id", "unknown")
     query_start = time.perf_counter()
@@ -590,6 +604,7 @@ async def query_history(
     session_id: UUID = Query(...),
     limit: int = Query(get_settings().query_history_limit_default, ge=1, le=get_settings().query_history_limit_max),
 ) -> list[QueryHistoryItem]:
+    """Return persisted query history for a specific session."""
     request_id = getattr(request.state, "request_id", "unknown")
     observer = observability.get_observability()
     try:
@@ -644,6 +659,7 @@ async def query_history_recent(
     auth_user: AuthUser = Depends(get_current_user),
     limit: int = Query(get_settings().query_history_limit_default, ge=1, le=get_settings().query_history_limit_max),
 ) -> list[QueryHistoryItem]:
+    """Return recent query history across the authenticated user scope."""
     request_id = getattr(request.state, "request_id", "unknown")
     observer = observability.get_observability()
     try:

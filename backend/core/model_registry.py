@@ -1,15 +1,18 @@
 from __future__ import annotations
+"""Model-provider registry and validation for agent model selections."""
 
 import os
 from dataclasses import dataclass
 
 
 class ModelValidationError(ValueError):
+    """Raised when provider/model selection is invalid."""
     pass
 
 
 @dataclass(frozen=True)
 class ModelSelection:
+    """Normalized provider/model pair after validation."""
     provider: str
     model_name: str
 
@@ -19,10 +22,12 @@ _DEFAULT_SARVAM_MODELS = "sarvam-m"
 
 
 def _parse_models_env(value: str) -> set[str]:
+    """Parse comma-separated model names into a normalized set."""
     return {item.strip() for item in value.split(",") if item.strip()}
 
 
 def allowed_models() -> dict[str, set[str]]:
+    """Return provider-to-allowed-model mappings from environment defaults."""
     groq_models = _parse_models_env(os.getenv("GROQ_AGENT_MODELS", _DEFAULT_GROQ_MODELS))
     sarvam_models = _parse_models_env(os.getenv("SARVAM_AGENT_MODELS", _DEFAULT_SARVAM_MODELS))
     sarvam_chat_model = os.getenv("SARVAM_CHAT_MODEL", "").strip()
@@ -41,6 +46,7 @@ def allowed_models() -> dict[str, set[str]]:
 
 
 def model_catalog() -> dict[str, list[str]]:
+    """Return sorted model lists for API/UI consumption."""
     models = allowed_models()
     return {
         "groq": sorted(models["groq"]),
@@ -50,6 +56,7 @@ def model_catalog() -> dict[str, list[str]]:
 
 
 def default_model_selection() -> ModelSelection:
+    """Select a deterministic default provider/model pair."""
     models = allowed_models()
     provider = "groq" if models["groq"] else "sarvam"
     choices = models[provider]
@@ -58,6 +65,7 @@ def default_model_selection() -> ModelSelection:
 
 
 def validate_model_selection(provider: str, model_name: str) -> ModelSelection:
+    """Validate and normalize a provider/model selection."""
     normalized_provider = provider.strip().lower()
     normalized_model_name = model_name.strip()
 

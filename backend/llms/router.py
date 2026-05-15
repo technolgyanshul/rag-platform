@@ -1,4 +1,5 @@
 from __future__ import annotations
+"""Provider routing for chat completions across configured LLM backends."""
 
 from typing import Any
 
@@ -8,10 +9,13 @@ from llms.sarvam_client import SarvamClient
 
 
 class LLMRouterError(RuntimeError):
+    """Raised when provider routing or provider invocation fails."""
     pass
 
 
 class LLMRouter:
+    """Dispatches chat requests to provider-specific clients."""
+
     def __init__(self, provider_clients: dict[str, Any] | None = None) -> None:
         self._provider_clients = provider_clients or {}
 
@@ -22,6 +26,7 @@ class LLMRouter:
         messages: list[dict[str, str]],
         metadata: dict[str, Any] | None = None,
     ) -> str:
+        """Route a chat request to the selected provider and normalize failures."""
         metadata = metadata or {}
         provider_name = provider.lower().strip()
 
@@ -49,6 +54,7 @@ class LLMRouter:
         messages: list[dict[str, str]],
         metadata: dict[str, Any],
     ) -> str:
+        """Invoke LM Studio chat after validating required metadata."""
         base_url = str(metadata.get("provider_base_url") or "").strip().rstrip("/")
         if not base_url:
             raise LMStudioError(category="invalid_config", message="metadata.provider_base_url is required for lmstudio")
@@ -69,6 +75,7 @@ class LLMRouter:
         metadata: dict[str, Any],
         error: Exception,
     ) -> str:
+        """Build a detailed error message with provider and agent context."""
         agent_bits = []
         if metadata.get("agent_name"):
             agent_bits.append(f"name={metadata['agent_name']}")

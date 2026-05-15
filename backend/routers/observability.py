@@ -1,4 +1,5 @@
 from __future__ import annotations
+"""Observability endpoints for client-side UI event ingestion."""
 
 import logging
 from typing import Any
@@ -15,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class UiEventRequest(BaseModel):
+    """Client UI event payload captured for observability pipelines."""
     event_name: str = Field(min_length=1, max_length=120)
     page: str = Field(default="", max_length=300)
     component: str = Field(default="", max_length=120)
@@ -36,6 +38,7 @@ async def record_ui_event(
     request: Request,
     auth_user: AuthUser = Depends(get_current_user),
     ) -> dict[str, bool]:
+    """Accept and persist a UI telemetry event for the authenticated user."""
     request_id = getattr(request.state, "request_id", request.headers.get("x-request-id", ""))
     try:
         observability.get_observability().record_ui_event(

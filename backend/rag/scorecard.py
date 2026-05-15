@@ -1,4 +1,5 @@
 from __future__ import annotations
+"""Deterministic scoring utilities for RAG answer quality and trace contribution."""
 
 from typing import Any
 
@@ -34,6 +35,7 @@ def evaluate_scorecard(
     traces: list[Any],
     retrieval_metadata: dict[str, Any],
 ) -> dict[str, Any]:
+    """Compute the response scorecard from answer, sources, citations, and traces."""
     answer = final_answer or ""
     source_items = sources or []
     citation_items = citations or []
@@ -69,6 +71,7 @@ def evaluate_scorecard(
 
 
 def _citation_accuracy(sources: list[dict[str, Any]], citations: list[dict[str, Any]]) -> int:
+    """Return citation accuracy score from strong/weak/missing evidence matches."""
     if not citations:
         return CITATION_MISSING_SCORE
     if any(_citation_matches_source(citation, sources) for citation in citations):
@@ -79,6 +82,7 @@ def _citation_accuracy(sources: list[dict[str, Any]], citations: list[dict[str, 
 
 
 def _citation_matches_source(citation: dict[str, Any], sources: list[dict[str, Any]]) -> bool:
+    """Check whether a citation maps to at least one retrieved source chunk."""
     source_index = _safe_int(citation.get("source_index"))
     if source_index is not None and 1 <= source_index <= len(sources):
         indexed_source = sources[source_index - 1]
@@ -90,6 +94,7 @@ def _citation_matches_source(citation: dict[str, Any], sources: list[dict[str, A
 
 
 def _same_chunk(citation: dict[str, Any], source: dict[str, Any]) -> bool:
+    """Compare citation and source identity using document id + chunk index."""
     citation_document_id = str(citation.get("document_id") or "").strip()
     source_document_id = str(source.get("document_id") or "").strip()
     citation_chunk_index = _safe_int(citation.get("chunk_index"))
@@ -105,10 +110,12 @@ def _same_chunk(citation: dict[str, Any], source: dict[str, Any]) -> bool:
 
 
 def _has_chunk_identity(citation: dict[str, Any]) -> bool:
+    """Return whether citation has enough identity fields for strict matching."""
     return bool(str(citation.get("document_id") or "").strip()) and _safe_int(citation.get("chunk_index")) is not None
 
 
 def _insight_depth(final_answer: str, contributing_traces: list[Any]) -> int:
+    """Score answer depth using length, role diversity, and role bonuses."""
     score = INSIGHT_BASE_SCORE
     answer_length = len(final_answer or "")
     if answer_length >= INSIGHT_LONG_ANSWER_THRESHOLD:
@@ -131,6 +138,7 @@ def _insight_depth(final_answer: str, contributing_traces: list[Any]) -> int:
 
 
 def _model_contribution_breakdown(traces: list[Any]) -> dict[str, dict[str, Any]]:
+    """Build per-agent contribution metadata for observability and UI display."""
     breakdown: dict[str, dict[str, Any]] = {}
     seen_names: dict[str, int] = {}
     for trace in traces:
@@ -152,21 +160,25 @@ def _model_contribution_breakdown(traces: list[Any]) -> dict[str, dict[str, Any]
 
 
 def _trace_contributed(trace: Any) -> bool:
+    """Return whether a trace produced non-empty output with completed status."""
     return _trace_value(trace, "status").strip().lower() == "completed" and bool(_trace_value(trace, "output").strip())
 
 
 def _trace_value(trace: Any, key: str) -> str:
+    """Read a stringified trace field from dict- or object-like traces."""
     value = _trace_raw_value(trace, key)
     return str(value or "")
 
 
 def _trace_raw_value(trace: Any, key: str) -> Any:
+    """Read a raw trace field from dict- or object-like traces."""
     if isinstance(trace, dict):
         return trace.get(key)
     return getattr(trace, key, None)
 
 
 def _safe_int(value: Any) -> int | None:
+    """Best-effort integer coercion that returns `None` on invalid inputs."""
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -180,6 +192,7 @@ def build_scorecard(
     traces: list[Any],
     retrieval_metadata: dict[str, Any],
 ) -> dict[str, Any]:
+    """Backward-compatible alias for `evaluate_scorecard`."""
     # Backward-compatible alias used by existing call sites/tests.
     return evaluate_scorecard(
         final_answer=final_answer,

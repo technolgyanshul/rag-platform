@@ -1,4 +1,5 @@
 from __future__ import annotations
+"""Authentication helpers for validating Supabase bearer tokens."""
 
 import logging
 import os
@@ -13,11 +14,13 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class AuthUser:
+    """Authenticated user identity extracted from Supabase auth payload."""
     user_id: str
     email: str | None = None
 
 
 def _extract_bearer_token(authorization: str | None) -> str:
+    """Parse and validate a Bearer token from the Authorization header."""
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing Authorization header")
     parts = authorization.split(" ", 1)
@@ -27,6 +30,7 @@ def _extract_bearer_token(authorization: str | None) -> str:
 
 
 def get_current_user(authorization: str | None = Header(default=None)) -> AuthUser:
+    """Resolve the current user by calling Supabase Auth with the access token."""
     token = _extract_bearer_token(authorization)
 
     supabase_url = os.getenv("SUPABASE_URL")
