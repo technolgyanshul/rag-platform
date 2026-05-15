@@ -179,8 +179,11 @@ export default function ChatPage() {
       >
         <div className="chat-layout">
           <div className="stack">
-            <div className="card">
-              <h3 style={{ marginBottom: 12 }}>Run Query</h3>
+            <div className="hero-card">
+              <div className="panel-title">
+                <h3>Run Query</h3>
+                <span>{selectedTeam ? selectedTeam.name : "Team required"}</span>
+              </div>
               <div className="form-field chat-team-selector">
                 <label htmlFor="chat-team-id">Team</label>
                 <select
@@ -212,18 +215,27 @@ export default function ChatPage() {
               />
             </div>
             <div className="card">
-              <h3 style={{ marginBottom: 12 }}>Answer</h3>
+              <div className="panel-title">
+                <h3>Answer</h3>
+                <span>{queryState.status}</span>
+              </div>
               <ChatWindow queryState={queryState} />
             </div>
           </div>
 
           <div className="stack">
             <div className="card">
-              <h3 style={{ marginBottom: 12 }}>Sources</h3>
+              <div className="panel-title">
+                <h3>Sources</h3>
+                <span>{response?.sources.length ?? 0} returned</span>
+              </div>
               <SourceList sources={response?.sources ?? []} />
             </div>
             <div className="card">
-              <h3 style={{ marginBottom: 12 }}>Agent Trace</h3>
+              <div className="panel-title">
+                <h3>Agent Trace</h3>
+                <span>{response?.traces.length ?? 0} steps</span>
+              </div>
               <div className="chat-trace-scroll">
                 <TracePanel
                   traces={response?.traces ?? []}

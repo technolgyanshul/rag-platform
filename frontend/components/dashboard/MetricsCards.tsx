@@ -13,15 +13,15 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
   return (
     <div className="metrics-grid">
       <article className="metric-card">
-        <h3>Total Queries</h3>
+        <h3><span className="material-symbols-outlined" aria-hidden>forum</span> Total Queries</h3>
         <p>{metrics.total_queries}</p>
       </article>
       <article className="metric-card">
-        <h3>Avg Response Time</h3>
+        <h3><span className="material-symbols-outlined" aria-hidden>speed</span> Avg Response Time</h3>
         <p>{metrics.average_response_time_ms} ms</p>
       </article>
       <article className="metric-card">
-        <h3>Avg Overall Score</h3>
+        <h3><span className="material-symbols-outlined" aria-hidden>verified</span> Avg Overall Score</h3>
         <p>{metrics.average_overall_score.toFixed(2)}</p>
       </article>
     </div>

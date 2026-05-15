@@ -19,11 +19,11 @@ export function Sidebar({ navItems, activePath, onNavigate, mobile = false }: Si
     <aside className={`side-nav${mobile ? " side-nav--mobile" : ""}`}>
       <div className="side-nav__brand">
         <div className="brand-mark">
-          <span className="material-symbols-outlined">memory</span>
+          <span className="material-symbols-outlined">bar_chart</span>
         </div>
         <div>
           <h1>RAG Ops</h1>
-          <p>Retrieval System</p>
+          <p>Agent Control</p>
         </div>
       </div>
 
@@ -43,6 +43,14 @@ export function Sidebar({ navItems, activePath, onNavigate, mobile = false }: Si
           );
         })}
       </nav>
+
+      <div className="side-nav__footer">
+        <span className="material-symbols-outlined">verified</span>
+        <div>
+          <strong>Cloud workspace</strong>
+          <small>Teams, traces, and files synced</small>
+        </div>
+      </div>
     </aside>
   );
 }

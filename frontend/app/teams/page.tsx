@@ -29,9 +29,12 @@ export default function TeamsPage() {
   return (
     <ProtectedPage>
       <AppShell title="Teams" subtitle="Manage teams and open team-specific editors">
-        <div className="card">
-          <div className="button-row" style={{ justifyContent: "space-between" }}>
-            <h3 style={{ marginBottom: 12 }}>Teams</h3>
+        <div className="hero-card">
+          <div className="panel-title">
+            <div>
+              <h3>Teams</h3>
+              <p className="status-message">Configure collaboration rules and open team-specific agent editors.</p>
+            </div>
             <Link href="/teams/new"><button type="button">Create team</button></Link>
           </div>
           {teams.length === 0 ? <p className="status-message">No teams created yet.</p> : null}

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 
 import { ProtectedPage } from "../../components/auth/ProtectedPage";
 import { MetricsCards } from "../../components/dashboard/MetricsCards";
@@ -61,7 +62,7 @@ export default function DashboardPage() {
           </button>
         }
       >
-        <div className="card">
+        <div className="hero-card">
           <form className="split-3" onSubmit={handleLoad}>
             <label>
               Session ID{" "}
@@ -90,13 +91,42 @@ export default function DashboardPage() {
           {message ? <p className="status-message" style={{ marginTop: 12 }}>{message}</p> : null}
         </div>
 
-        <div className="card">
-          <h3 style={{ marginBottom: 12 }}>Metrics</h3>
-          <MetricsCards metrics={metrics} />
+        <div className="split-2">
+          <div className="card">
+            <div className="panel-title">
+              <h3>Metrics</h3>
+              <span>{metrics ? `${days} day window` : "No session loaded"}</span>
+            </div>
+            <MetricsCards metrics={metrics} />
+          </div>
+
+          <div className="card">
+            <div className="panel-title">
+              <h3>Quick Actions</h3>
+              <span>Workspace</span>
+            </div>
+            <div className="action-list">
+              <Link className="action-link" href="/teams/new">
+                <span>Create a team</span>
+                <span className="material-symbols-outlined">arrow_forward</span>
+              </Link>
+              <Link className="action-link" href="/knowledge">
+                <span>Upload knowledge</span>
+                <span className="material-symbols-outlined">arrow_forward</span>
+              </Link>
+              <Link className="action-link" href="/chat">
+                <span>Run chat</span>
+                <span className="material-symbols-outlined">arrow_forward</span>
+              </Link>
+            </div>
+          </div>
         </div>
 
         <div className="card">
-          <h3 style={{ marginBottom: 12 }}>Queries Over Time</h3>
+          <div className="panel-title">
+            <h3>Queries Over Time</h3>
+            <span>Session trend</span>
+          </div>
           <QueriesChart metrics={metrics} />
         </div>
       </AppShell>

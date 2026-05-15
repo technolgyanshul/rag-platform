@@ -15,8 +15,8 @@ type AppShellProps = {
 };
 
 const navItems: NavItem[] = [
-  { href: "/teams", label: "Teams", icon: "groups" },
   { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
+  { href: "/teams", label: "Teams", icon: "groups" },
   { href: "/knowledge", label: "Knowledge Base", icon: "database" },
   { href: "/chat", label: "Chat Workspace", icon: "forum" },
   { href: "/history", label: "Query Logs", icon: "history" },
@@ -61,6 +61,7 @@ export function AppShell({ title, subtitle, actions, children }: AppShellProps) 
         <main className="shell-content">
           <section className="page-header">
             <div>
+              <p className="page-kicker">RAG Ops Console</p>
               <h2>{title}</h2>
               <p>{subtitle}</p>
             </div>

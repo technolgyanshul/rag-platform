@@ -101,16 +101,23 @@ export default function KnowledgePage() {
         }
       >
         <div className="split-2">
-          <div className="card">
-            <p className="status-message" style={{ marginTop: 10 }}>
-              This demo uses your signed-in account as the workspace context for uploads, chat, and analytics.
+          <div className="hero-card">
+            <div className="panel-title">
+              <h3>Workspace Storage</h3>
+              <span>{documents.length} documents</span>
+            </div>
+            <p className="status-message">
+              Uploaded files are kept under your signed-in workspace and feed retrieval for chat, history, and scorecard inspection.
             </p>
           </div>
           <UploadPanel onUploaded={() => void refreshDocuments()} />
         </div>
 
         <div className="card">
-          <h3 style={{ marginBottom: 12 }}>Uploaded Documents</h3>
+          <div className="panel-title">
+            <h3>Uploaded Documents</h3>
+            <span>{documents.length ? "Live data" : "Empty"}</span>
+          </div>
           {documents.length === 0 ? (
             <p className="status-message">{message}</p>
           ) : (

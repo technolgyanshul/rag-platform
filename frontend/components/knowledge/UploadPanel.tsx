@@ -64,7 +64,10 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
 
   return (
     <div className="card">
-      <h3 style={{ marginBottom: 12 }}>Upload Document</h3>
+      <div className="panel-title">
+        <h3>Upload Document</h3>
+        <span>PDF, image, text</span>
+      </div>
       <form className="auth-form" onSubmit={handleSubmit}>
         <label>
           File

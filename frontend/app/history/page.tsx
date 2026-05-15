@@ -52,7 +52,7 @@ export default function HistoryPage() {
   return (
     <ProtectedPage>
       <AppShell title="Session History" subtitle="Open any previous session and inspect full outputs and traces">
-        <div className="card">
+        <div className="hero-card">
           <div className="page-header__actions">
             <button type="button" onClick={() => void loadSessions()} disabled={loading}>
               {loading ? "Refreshing..." : "Refresh"}
@@ -61,7 +61,10 @@ export default function HistoryPage() {
         </div>
 
         <div className="card">
-          <h3 style={{ marginBottom: 12 }}>Your Sessions</h3>
+          <div className="panel-title">
+            <h3>Your Sessions</h3>
+            <span>{sessions.length} listed</span>
+          </div>
           {sessions.length === 0 ? (
             <p className="status-message">{message}</p>
           ) : (

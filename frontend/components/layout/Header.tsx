@@ -12,13 +12,12 @@ export function Header({ onMenuClick }: HeaderProps) {
         </button>
         <div className="top-bar__search">
           <span className="material-symbols-outlined">search</span>
-          <input type="text" placeholder="Search traces, teams, or documents" readOnly />
+          <input type="text" placeholder="Search workspace" readOnly />
         </div>
       </div>
       <div className="top-bar__actions" aria-hidden>
-        <span className="material-symbols-outlined">terminal</span>
-        <span className="material-symbols-outlined">notifications</span>
-        <span className="material-symbols-outlined">help</span>
+        <span className="top-bar__status-dot" />
+        <span>Operational</span>
       </div>
     </header>
   );
