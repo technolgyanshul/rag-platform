@@ -60,7 +60,7 @@ def default_model_selection() -> ModelSelection:
     models = allowed_models()
     provider = "groq" if models["groq"] else "sarvam"
     choices = models[provider]
-    model_name = sorted(choices)[0] if choices else ""
+    model_name = min(choices) if choices else ""
     return ModelSelection(provider=provider, model_name=model_name)
 
 

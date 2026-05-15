@@ -1,7 +1,7 @@
 from __future__ import annotations
 """Team and agent management endpoints, including LM Studio probes."""
 
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -250,7 +250,7 @@ def _http_for_team_repository_error(error: Exception) -> HTTPException:
 
 
 @router.get("/models", response_model=ModelsResponse, responses={503: {"description": "Model catalog temporarily unavailable"}})
-async def list_models(_auth_user: AuthUser = Depends(get_current_user)) -> ModelsResponse:
+async def list_models(_auth_user: Annotated[AuthUser, Depends(get_current_user)]) -> ModelsResponse:
     """Return available model catalog for supported providers."""
     try:
         catalog = model_catalog()
@@ -276,7 +276,7 @@ def _lmstudio_http_error(error: LMStudioError) -> HTTPException:
 
 
 @router.post("/lmstudio/health", response_model=LMStudioHealthResponse)
-async def lmstudio_health_probe(payload: LMStudioProbeRequest, _auth_user: AuthUser = Depends(get_current_user)) -> LMStudioHealthResponse:
+async def lmstudio_health_probe(payload: LMStudioProbeRequest, _auth_user: Annotated[AuthUser, Depends(get_current_user)]) -> LMStudioHealthResponse:
     """Probe LM Studio health for provided base URL and passcode."""
     try:
         result = LMStudioClient().health(
@@ -290,7 +290,7 @@ async def lmstudio_health_probe(payload: LMStudioProbeRequest, _auth_user: AuthU
 
 
 @router.post("/lmstudio/models", response_model=LMStudioModelsResponse)
-async def lmstudio_model_probe(payload: LMStudioProbeRequest, _auth_user: AuthUser = Depends(get_current_user)) -> LMStudioModelsResponse:
+async def lmstudio_model_probe(payload: LMStudioProbeRequest, _auth_user: Annotated[AuthUser, Depends(get_current_user)]) -> LMStudioModelsResponse:
     """Probe and return visible LM Studio model names."""
     try:
         models = LMStudioClient().list_models(
@@ -308,7 +308,7 @@ async def lmstudio_model_probe(payload: LMStudioProbeRequest, _auth_user: AuthUs
     response_model=AgentDefaultsResponse,
     responses={503: {"description": "Agent defaults temporarily unavailable"}},
 )
-async def list_agent_defaults(_auth_user: AuthUser = Depends(get_current_user)) -> AgentDefaultsResponse:
+async def list_agent_defaults(_auth_user: Annotated[AuthUser, Depends(get_current_user)]) -> AgentDefaultsResponse:
     """Return backend-defined default team agent templates."""
     try:
         defaults = default_team_agents()
@@ -336,7 +336,7 @@ async def list_agent_defaults(_auth_user: AuthUser = Depends(get_current_user)) 
 
 
 @router.get("", response_model=list[TeamResponse], responses={503: {"description": "Team service temporarily unavailable"}})
-async def list_teams(auth_user: AuthUser = Depends(get_current_user)) -> list[TeamResponse]:
+async def list_teams(auth_user: Annotated[AuthUser, Depends(get_current_user)]) -> list[TeamResponse]:
     """List teams owned by the authenticated user."""
     try:
         rows = SupabaseRepository().list_teams(user_id=auth_user.user_id)
@@ -346,7 +346,7 @@ async def list_teams(auth_user: AuthUser = Depends(get_current_user)) -> list[Te
 
 
 @router.post("", response_model=TeamCreateResponse, responses={400: {"description": "Validation failed"}, 503: {"description": "Team service temporarily unavailable"}})
-async def create_team(payload: TeamCreateRequest, auth_user: AuthUser = Depends(get_current_user)) -> TeamCreateResponse:
+async def create_team(payload: TeamCreateRequest, auth_user: Annotated[AuthUser, Depends(get_current_user)]) -> TeamCreateResponse:
     """Create a team for the authenticated user."""
     try:
         row = SupabaseRepository().create_team(
@@ -368,7 +368,7 @@ async def create_team(payload: TeamCreateRequest, auth_user: AuthUser = Depends(
     response_model=SeedReportResponse,
     responses={403: {"description": "Forbidden"}, 404: {"description": "Not found"}, 503: {"description": "Team service temporarily unavailable"}},
 )
-async def seed_default_agents(team_id: str, auth_user: AuthUser = Depends(get_current_user)) -> SeedReportResponse:
+async def seed_default_agents(team_id: str, auth_user: Annotated[AuthUser, Depends(get_current_user)]) -> SeedReportResponse:
     """Retry default-agent seeding for an owned team and return detailed outcome."""
     repository = SupabaseRepository()
     _ensure_owned_team(repository=repository, user_id=auth_user.user_id, team_id=team_id)
@@ -386,7 +386,7 @@ async def seed_default_agents(team_id: str, auth_user: AuthUser = Depends(get_cu
 
 
 @router.get("/{team_id}", response_model=TeamResponse, responses={403: {"description": "Forbidden"}, 404: {"description": "Not found"}, 503: {"description": "Team service temporarily unavailable"}})
-async def get_team(team_id: str, auth_user: AuthUser = Depends(get_current_user)) -> TeamResponse:
+async def get_team(team_id: str, auth_user: Annotated[AuthUser, Depends(get_current_user)]) -> TeamResponse:
     """Return one owned team by id."""
     repository = SupabaseRepository()
     try:
@@ -399,7 +399,7 @@ async def get_team(team_id: str, auth_user: AuthUser = Depends(get_current_user)
 
 
 @router.patch("/{team_id}", response_model=TeamResponse, responses={400: {"description": "Validation failed"}, 403: {"description": "Forbidden"}, 404: {"description": "Not found"}, 503: {"description": "Team service temporarily unavailable"}})
-async def patch_team(team_id: str, payload: TeamPatchRequest, auth_user: AuthUser = Depends(get_current_user)) -> TeamResponse:
+async def patch_team(team_id: str, payload: TeamPatchRequest, auth_user: Annotated[AuthUser, Depends(get_current_user)]) -> TeamResponse:
     """Partially update an owned team."""
     updates = payload.model_dump(exclude_unset=True)
     if not updates:
@@ -421,7 +421,7 @@ async def patch_team(team_id: str, payload: TeamPatchRequest, auth_user: AuthUse
 
 
 @router.delete("/{team_id}", responses={403: {"description": "Forbidden"}, 404: {"description": "Not found"}, 503: {"description": "Team service temporarily unavailable"}})
-async def delete_team(team_id: str, auth_user: AuthUser = Depends(get_current_user)) -> dict[str, bool]:
+async def delete_team(team_id: str, auth_user: Annotated[AuthUser, Depends(get_current_user)]) -> dict[str, bool]:
     """Delete an owned team."""
     repository = SupabaseRepository()
     _ensure_owned_team(repository=repository, user_id=auth_user.user_id, team_id=team_id)
@@ -435,7 +435,7 @@ async def delete_team(team_id: str, auth_user: AuthUser = Depends(get_current_us
 
 
 @router.get("/{team_id}/agents", response_model=list[AgentResponse], responses={403: {"description": "Forbidden"}, 404: {"description": "Not found"}, 503: {"description": "Agent service temporarily unavailable"}})
-async def list_agents(team_id: str, auth_user: AuthUser = Depends(get_current_user)) -> list[AgentResponse]:
+async def list_agents(team_id: str, auth_user: Annotated[AuthUser, Depends(get_current_user)]) -> list[AgentResponse]:
     """List agents configured under an owned team."""
     repository = SupabaseRepository()
     _ensure_owned_team(repository=repository, user_id=auth_user.user_id, team_id=team_id)
@@ -449,7 +449,7 @@ async def list_agents(team_id: str, auth_user: AuthUser = Depends(get_current_us
 
 
 @router.post("/{team_id}/agents", response_model=AgentResponse, responses={400: {"description": "Validation failed"}, 403: {"description": "Forbidden"}, 404: {"description": "Not found"}, 503: {"description": "Agent service temporarily unavailable"}})
-async def create_agent(team_id: str, payload: AgentCreateRequest, auth_user: AuthUser = Depends(get_current_user)) -> AgentResponse:
+async def create_agent(team_id: str, payload: AgentCreateRequest, auth_user: Annotated[AuthUser, Depends(get_current_user)]) -> AgentResponse:
     """Create an agent under an owned team with validated model selection."""
     repository = SupabaseRepository()
     _ensure_owned_team(repository=repository, user_id=auth_user.user_id, team_id=team_id)
@@ -490,7 +490,7 @@ async def create_agent(team_id: str, payload: AgentCreateRequest, auth_user: Aut
 
 
 @router.patch("/{team_id}/agents/{agent_id}", response_model=AgentResponse, responses={400: {"description": "Validation failed"}, 403: {"description": "Forbidden"}, 404: {"description": "Not found"}, 503: {"description": "Agent service temporarily unavailable"}})
-async def patch_agent(team_id: str, agent_id: str, payload: AgentPatchRequest, auth_user: AuthUser = Depends(get_current_user)) -> AgentResponse:
+async def patch_agent(team_id: str, agent_id: str, payload: AgentPatchRequest, auth_user: Annotated[AuthUser, Depends(get_current_user)]) -> AgentResponse:
     """Partially update an existing agent under an owned team."""
     updates = payload.model_dump(exclude_unset=True)
     if not updates:
@@ -533,7 +533,7 @@ async def patch_agent(team_id: str, agent_id: str, payload: AgentPatchRequest, a
 
 
 @router.delete("/{team_id}/agents/{agent_id}", responses={403: {"description": "Forbidden"}, 404: {"description": "Not found"}, 503: {"description": "Agent service temporarily unavailable"}})
-async def delete_agent(team_id: str, agent_id: str, auth_user: AuthUser = Depends(get_current_user)) -> dict[str, bool]:
+async def delete_agent(team_id: str, agent_id: str, auth_user: Annotated[AuthUser, Depends(get_current_user)]) -> dict[str, bool]:
     """Delete an agent from an owned team."""
     repository = SupabaseRepository()
     _ensure_owned_team(repository=repository, user_id=auth_user.user_id, team_id=team_id)

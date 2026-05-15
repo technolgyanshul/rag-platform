@@ -5,8 +5,10 @@ import logging
 import time
 import traceback
 from datetime import UTC, datetime
-from typing import Any
+from typing import Annotated, Any
 from urllib.parse import urlparse
+
+from fastapi import Depends
 
 from core.config import get_settings
 
@@ -344,3 +346,6 @@ def get_observability() -> ClickHouseObservability:
 def reset_observability() -> None:
     global _OBSERVABILITY
     _OBSERVABILITY = None
+
+
+ObservabilityDep = Annotated[ClickHouseObservability, Depends(get_observability)]

@@ -21,7 +21,7 @@ def test_settings_include_qdrant_embedanything_defaults(monkeypatch: pytest.Monk
 
     settings = get_settings()
 
-    assert settings.qdrant_url == "http://qdrant:6333"
+    assert settings.qdrant_url == "https://qdrant:6333"
     assert settings.qdrant_collection == "rag_documents"
     assert settings.embedanything_model == "sentence-transformers/all-MiniLM-L6-v2"
     assert settings.embedanything_chunk_strategy == "semantic"
@@ -30,7 +30,7 @@ def test_settings_include_qdrant_embedanything_defaults(monkeypatch: pytest.Monk
 
 
 def test_settings_read_qdrant_embedanything_env_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("QDRANT_URL", "http://localhost:6333")
+    monkeypatch.setenv("QDRANT_URL", "https://localhost:6333")
     monkeypatch.setenv("QDRANT_COLLECTION", "custom_docs")
     monkeypatch.setenv("EMBEDANYTHING_MODEL", "BAAI/bge-base-en-v1.5")
     monkeypatch.setenv("EMBEDANYTHING_CHUNK_STRATEGY", "sentence")
@@ -39,7 +39,7 @@ def test_settings_read_qdrant_embedanything_env_overrides(monkeypatch: pytest.Mo
 
     settings = get_settings()
 
-    assert settings.qdrant_url == "http://localhost:6333"
+    assert settings.qdrant_url == "https://localhost:6333"
     assert settings.qdrant_collection == "custom_docs"
     assert settings.embedanything_model == "BAAI/bge-base-en-v1.5"
     assert settings.embedanything_chunk_strategy == "sentence"

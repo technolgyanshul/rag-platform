@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -197,7 +197,11 @@ def _documents_indexed_without_hits(documents: list[dict[str, Any]]) -> bool:
         },
     },
 )
-async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser = Depends(get_current_user)) -> QueryResponse:
+async def run_query(
+    payload: QueryRequest,
+    request: Request,
+    auth_user: Annotated[AuthUser, Depends(get_current_user)],
+) -> QueryResponse:
     """Execute retrieval + orchestration and persist a query result."""
     settings = get_settings()
     request_id = getattr(request.state, "request_id", "unknown")
@@ -617,9 +621,12 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
 )
 async def query_history(
     request: Request,
-    auth_user: AuthUser = Depends(get_current_user),
-    session_id: UUID = Query(...),
-    limit: int = Query(get_settings().query_history_limit_default, ge=1, le=get_settings().query_history_limit_max),
+    auth_user: Annotated[AuthUser, Depends(get_current_user)],
+    session_id: Annotated[UUID, Query()],
+    limit: Annotated[
+        int,
+        Query(ge=1, le=get_settings().query_history_limit_max),
+    ] = get_settings().query_history_limit_default,
 ) -> list[QueryHistoryItem]:
     """Return persisted query history for a specific session."""
     request_id = getattr(request.state, "request_id", "unknown")
@@ -673,8 +680,11 @@ async def query_history(
 )
 async def query_history_recent(
     request: Request,
-    auth_user: AuthUser = Depends(get_current_user),
-    limit: int = Query(get_settings().query_history_limit_default, ge=1, le=get_settings().query_history_limit_max),
+    auth_user: Annotated[AuthUser, Depends(get_current_user)],
+    limit: Annotated[
+        int,
+        Query(ge=1, le=get_settings().query_history_limit_max),
+    ] = get_settings().query_history_limit_default,
 ) -> list[QueryHistoryItem]:
     """Return recent query history across the authenticated user scope."""
     request_id = getattr(request.state, "request_id", "unknown")

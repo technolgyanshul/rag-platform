@@ -212,7 +212,7 @@ async def test_lmstudio_requires_base_url_and_allows_custom_model_name() -> None
 async def test_cross_user_team_forbidden() -> None:
     team = await _create_team()
 
-    async def _other_user() -> AuthUser:
+    def _other_user() -> AuthUser:
         return AuthUser(user_id="99999999-9999-9999-9999-999999999999", email="other@example.com")
 
     app.dependency_overrides[get_current_user] = _other_user

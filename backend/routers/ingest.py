@@ -21,6 +21,7 @@ from rag.vector_backend import VectorPoint
 
 
 INGEST_ROUTE_PREFIX = "/ingest"
+INGEST_DOCUMENT_ROUTE = f"{INGEST_ROUTE_PREFIX}/documents/{{document_id}}"
 
 router = APIRouter(prefix=INGEST_ROUTE_PREFIX, tags=["ingest"])
 logger = logging.getLogger(__name__)
@@ -79,7 +80,7 @@ def _evict_old_idempotency_entries() -> None:
         _INGEST_IDEMPOTENCY_CACHE.popitem(last=False)
 
 
-@router.post("", response_model=IngestResponse, responses={400: {}, 403: {}, 500: {}, 503: {}})
+@router.post("", responses={400: {}, 403: {}, 500: {}, 503: {}})
 async def ingest(
     request: Request,
     auth_user: AuthUser = Depends(get_current_user),
@@ -383,7 +384,7 @@ async def ingest(
     return response
 
 
-@router.get("/documents", response_model=list[DocumentListItem], responses={403: {}, 503: {}})
+@router.get("/documents", responses={403: {}, 503: {}})
 async def list_documents(
     request: Request,
     auth_user: AuthUser = Depends(get_current_user),
@@ -430,7 +431,7 @@ async def list_documents(
     return [DocumentListItem(**row) for row in rows]
 
 
-@router.delete("/documents/{document_id}", response_model=DeleteDocumentResponse, responses={403: {}, 404: {}, 503: {}})
+@router.delete("/documents/{document_id}", responses={403: {}, 404: {}, 503: {}})
 async def delete_document(
     document_id: str,
     request: Request,
@@ -451,7 +452,7 @@ async def delete_document(
             event_name="ingest_document_deleted",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest/documents/{document_id}",
+            route=INGEST_DOCUMENT_ROUTE,
             component="ingest_router",
             status="success",
             metadata={"document_id": document_id, "storage_path": document.get("storage_path")},
@@ -463,7 +464,7 @@ async def delete_document(
             event_name="ingest_document_delete_permission_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest/documents/{document_id}",
+            route=INGEST_DOCUMENT_ROUTE,
             component="ingest_router",
             level="WARNING",
             status="failed",
@@ -476,7 +477,7 @@ async def delete_document(
             event_name="ingest_document_delete_storage_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest/documents/{document_id}",
+            route=INGEST_DOCUMENT_ROUTE,
             component="supabase_storage",
             level="ERROR",
             status="failed",
@@ -490,7 +491,7 @@ async def delete_document(
             event_name="ingest_document_delete_failed",
             request_id=request_id,
             user_id=auth_user.user_id,
-            route="/ingest/documents/{document_id}",
+            route=INGEST_DOCUMENT_ROUTE,
             component="ingest_router",
             level="ERROR",
             status="failed",
@@ -501,7 +502,7 @@ async def delete_document(
     return DeleteDocumentResponse(ok=True)
 
 
-@router.get("/documents/{document_id}/download", response_model=DocumentDownloadResponse, responses={403: {}, 503: {}})
+@router.get("/documents/{document_id}/download", responses={403: {}, 503: {}})
 async def create_document_download_url(
     document_id: str,
     request: Request,

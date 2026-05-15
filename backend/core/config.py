@@ -97,7 +97,7 @@ def get_settings() -> Settings:
         dashboard_days_default=_parse_int("DASHBOARD_DAYS_DEFAULT", default=7, min_value=1),
         dashboard_days_max=_parse_int("DASHBOARD_DAYS_MAX", default=30, min_value=1),
         allowed_file_types=allowed,
-        qdrant_url=os.getenv("QDRANT_URL", "http://qdrant:6333"),
+        qdrant_url=os.getenv("QDRANT_URL", "https://qdrant:6333"),
         qdrant_collection=os.getenv("QDRANT_COLLECTION", "rag_documents"),
         embedanything_model=os.getenv("EMBEDANYTHING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"),
         embedanything_chunk_strategy=os.getenv("EMBEDANYTHING_CHUNK_STRATEGY", "semantic"),

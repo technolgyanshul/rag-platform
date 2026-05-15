@@ -37,10 +37,10 @@ def test_clickhouse_settings_defaults_disabled(monkeypatch: pytest.MonkeyPatch) 
     assert settings.clickhouse_password == ""
     assert settings.clickhouse_strict is True
     assert settings.clickhouse_log_raw_payloads is False
-    assert settings.clickhouse_connect_timeout_seconds == 5.0
-    assert settings.clickhouse_read_timeout_seconds == 15.0
+    assert settings.clickhouse_connect_timeout_seconds == pytest.approx(5.0)
+    assert settings.clickhouse_read_timeout_seconds == pytest.approx(15.0)
     assert settings.clickhouse_init_max_retries == 2
-    assert settings.clickhouse_init_retry_backoff_seconds == 1.0
+    assert settings.clickhouse_init_retry_backoff_seconds == pytest.approx(1.0)
 
 
 def test_clickhouse_settings_accept_cloud_connection_values(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -65,10 +65,10 @@ def test_clickhouse_settings_accept_cloud_connection_values(monkeypatch: pytest.
     assert settings.clickhouse_password == "cloud_password"
     assert settings.clickhouse_strict is True
     assert settings.clickhouse_log_raw_payloads is False
-    assert settings.clickhouse_connect_timeout_seconds == 7.5
-    assert settings.clickhouse_read_timeout_seconds == 21.0
+    assert settings.clickhouse_connect_timeout_seconds == pytest.approx(7.5)
+    assert settings.clickhouse_read_timeout_seconds == pytest.approx(21.0)
     assert settings.clickhouse_init_max_retries == 4
-    assert settings.clickhouse_init_retry_backoff_seconds == 0.25
+    assert settings.clickhouse_init_retry_backoff_seconds == pytest.approx(0.25)
 
 
 def test_observability_redacts_auth_headers_and_preserves_payload() -> None:

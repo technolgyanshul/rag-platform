@@ -185,7 +185,7 @@ async def test_session_export_rejects_other_users_session() -> None:
     session_id = "91919191-9191-9191-9191-919191919191"
     repository.create_session(user_id=owner_id, session_id=session_id, team_id=str(team["id"]), title="Private Session")
 
-    async def _other_user() -> AuthUser:
+    def _other_user() -> AuthUser:
         return AuthUser(user_id=other_id, email="other@example.com")
 
     app.dependency_overrides[get_current_user] = _other_user

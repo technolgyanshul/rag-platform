@@ -7,7 +7,8 @@ import { ProtectedPage } from "../../components/auth/ProtectedPage";
 import { MetricsCards } from "../../components/dashboard/MetricsCards";
 import { QueriesChart } from "../../components/dashboard/QueriesChart";
 import { AppShell } from "../../components/layout/AppShell";
-import { getDashboardMetrics, logUiEvent } from "../../lib/api";
+import { getDashboardMetrics, listSessions, logUiEvent } from "../../lib/api";
+import { selectMostRecentRunnableSession } from "../../lib/session-selection";
 import { DashboardMetrics } from "../../lib/types";
 
 /** Dashboard page for session telemetry and trend exploration. */
@@ -15,40 +16,88 @@ export default function DashboardPage() {
   const [sessionId, setSessionId] = useState("");
   const [days, setDays] = useState(7);
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [message, setMessage] = useState("Enter a session ID to view dashboard metrics.");
+  const [message, setMessage] = useState("Loading latest session metrics...");
 
-  useEffect(() => {
-    void logUiEvent({ event_name: "page_view", page: "/dashboard", component: "DashboardPage", action: "load" }).catch(() => undefined);
-  }, []);
-
-  const handleLoad = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!sessionId.trim()) {
+  const loadMetricsForSession = async (
+    targetSessionId: string,
+    windowDays: number,
+    action: "auto_load_latest_session" | "load_metrics",
+    isCancelled: () => boolean = () => false,
+  ) => {
+    if (!targetSessionId.trim()) {
       setMessage("Please provide a session ID.");
       return;
     }
     try {
-      const payload = await getDashboardMetrics(sessionId.trim(), days);
+      const payload = await getDashboardMetrics(targetSessionId.trim(), windowDays);
+      if (isCancelled()) {
+        return;
+      }
       await logUiEvent({
         event_name: "dashboard_metrics_success",
         page: "/dashboard",
         component: "DashboardPage",
-        action: "load_metrics",
-        payload: { session_id: sessionId.trim(), days, metrics: payload },
+        action,
+        payload: { session_id: targetSessionId.trim(), days: windowDays, metrics: payload },
       }).catch(() => undefined);
       setMetrics(payload);
       setMessage("");
     } catch (error) {
+      if (isCancelled()) {
+        return;
+      }
       await logUiEvent({
         event_name: "dashboard_metrics_failure",
         page: "/dashboard",
         component: "DashboardPage",
-        action: "load_metrics",
-        payload: { session_id: sessionId.trim(), days, error: error instanceof Error ? error.message : String(error) },
+        action,
+        payload: { session_id: targetSessionId.trim(), days: windowDays, error: error instanceof Error ? error.message : String(error) },
       }).catch(() => undefined);
       setMetrics(null);
       setMessage(error instanceof Error ? error.message : "Could not load dashboard metrics.");
     }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadLatestSession = async () => {
+      await logUiEvent({ event_name: "page_view", page: "/dashboard", component: "DashboardPage", action: "load" }).catch(() => undefined);
+
+      try {
+        const sessions = await listSessions();
+        if (cancelled) {
+          return;
+        }
+
+        const latestSession = selectMostRecentRunnableSession(sessions);
+        if (!latestSession) {
+          setMessage("No sessions found. Run a chat query first or enter a session ID.");
+          return;
+        }
+
+        setSessionId(latestSession.id);
+        await loadMetricsForSession(latestSession.id, days, "auto_load_latest_session", () => cancelled);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        setMetrics(null);
+        setMessage(error instanceof Error ? error.message : "Could not load latest session.");
+      }
+    };
+
+    void loadLatestSession();
+    return () => {
+      cancelled = true;
+    };
+    // Run once on mount so manual time-window edits do not unexpectedly reload metrics.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleLoad = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await loadMetricsForSession(sessionId, days, "load_metrics");
   };
 
   return (

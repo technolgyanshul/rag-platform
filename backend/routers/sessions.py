@@ -130,7 +130,6 @@ class SessionExportResponse(BaseModel):
 
 @router.post(
     "",
-    response_model=SessionResponse,
     responses={
         403: {"description": "Forbidden"},
         503: {"description": "Session service temporarily unavailable"},
@@ -199,7 +198,6 @@ async def create_session(
 
 @router.get(
     "",
-    response_model=list[SessionListItem],
     responses={
         503: {"description": "Session list temporarily unavailable"},
     },
@@ -312,7 +310,6 @@ async def export_session_json(
 
 @router.get(
     "/{session_id}",
-    response_model=SessionDetailResponse,
     responses={
         403: {"description": "Forbidden"},
         503: {"description": "Session detail temporarily unavailable"},
