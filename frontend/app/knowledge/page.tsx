@@ -163,18 +163,32 @@ export default function KnowledgePage() {
                 <thead>
                   <tr>
                     <th>Filename</th>
+                    <th>Actions</th>
                     <th>Type</th>
                     <th>Chunks</th>
                     <th>Status</th>
                     <th>Uploaded</th>
-                    <th>Source</th>
-                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {documents.map((document: DocumentRow) => (
                     <tr key={document.id}>
                       <td>{document.filename}</td>
+                      <td>
+                        <div className="button-row">
+                          <button type="button" onClick={() => void handleDownload(document.id)}>
+                            Open file
+                          </button>
+                          <button
+                            type="button"
+                            className="button-danger"
+                            disabled={deletingDocumentId === document.id}
+                            onClick={() => void handleDelete(document)}
+                          >
+                            {deletingDocumentId === document.id ? "Deleting..." : "Delete"}
+                          </button>
+                        </div>
+                      </td>
                       <td>{document.file_type.toUpperCase()}</td>
                       <td>{document.chunk_count}</td>
                       <td>
@@ -188,21 +202,6 @@ export default function KnowledgePage() {
                         })()}
                       </td>
                       <td>{new Date(document.uploaded_at).toLocaleString()}</td>
-                      <td>
-                        <button type="button" onClick={() => void handleDownload(document.id)}>
-                          Open file
-                        </button>
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="button-danger"
-                          disabled={deletingDocumentId === document.id}
-                          onClick={() => void handleDelete(document)}
-                        >
-                          {deletingDocumentId === document.id ? "Deleting..." : "Delete"}
-                        </button>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
