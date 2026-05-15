@@ -14,6 +14,7 @@ class FakeQdrantClient:
         self.create_collection_calls: list[dict[str, Any]] = []
         self.upsert_calls: list[dict[str, Any]] = []
         self.search_calls: list[dict[str, Any]] = []
+        self.delete_calls: list[dict[str, Any]] = []
         self.search_results: list[Any] = []
 
     def collection_exists(self, collection_name: str) -> bool:
@@ -34,6 +35,9 @@ class FakeQdrantClient:
     def search(self, **kwargs: Any) -> list[Any]:
         self.search_calls.append(kwargs)
         return self.search_results
+
+    def delete(self, **kwargs: Any) -> None:
+        self.delete_calls.append(kwargs)
 
 
 class FakeResult:
@@ -130,6 +134,23 @@ def test_search_applies_user_id_filter_and_sorts_by_score() -> None:
     assert first_row is not None
     assert first_row.score == pytest.approx(0.9)
     assert first_row.metadata == {"section": "intro"}
+
+
+def test_delete_document_points_filters_by_user_and_document() -> None:
+    client = FakeQdrantClient()
+    client.collections.add("rag_chunks")
+    backend = QdrantVectorBackend(client=client, collection_name="rag_chunks", vector_size=2)
+
+    backend.delete_document_points(user_id="user-a", document_id="doc-1")
+
+    delete_call = next(iter(client.delete_calls), None)
+    assert delete_call is not None
+    assert delete_call["collection_name"] == "rag_chunks"
+    filter_conditions = delete_call["points_selector"].must
+    assert [(condition.key, condition.match.value) for condition in filter_conditions] == [
+        ("user_id", "user-a"),
+        ("document_id", "doc-1"),
+    ]
 
 
 def _point(

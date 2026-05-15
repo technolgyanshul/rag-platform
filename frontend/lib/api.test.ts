@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApiRequestError,
   createSession,
+  deleteKnowledgeDocument,
   downloadSessionExport,
   getDocumentDownloadUrl,
   getSessionDetail,
@@ -88,6 +89,36 @@ describe("listKnowledgeDocuments", () => {
     );
 
     await expect(listKnowledgeDocuments()).rejects.toThrow("Could not load documents");
+  });
+});
+
+describe("deleteKnowledgeDocument", () => {
+  it("sends authenticated delete request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await deleteKnowledgeDocument("doc-1");
+
+    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/ingest/documents/doc-1", {
+      method: "DELETE",
+      headers: {
+        Authorization: "Bearer test-token",
+      },
+    });
+  });
+
+  it("throws backend detail when delete fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        json: vi.fn().mockResolvedValue({ detail: "Document not found" }),
+      }),
+    );
+
+    await expect(deleteKnowledgeDocument("missing-doc")).rejects.toThrow("Document not found");
   });
 });
 

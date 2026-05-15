@@ -140,6 +140,17 @@ export async function getDocumentDownloadUrl(documentId: string): Promise<Docume
   return response.json();
 }
 
+export async function deleteKnowledgeDocument(documentId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/ingest/documents/${encodeURIComponent(documentId)}`, {
+    method: "DELETE",
+    headers: await buildAuthHeaders(),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.detail ?? "Could not delete document");
+  }
+}
+
 export async function runQuery(payload: {
   query: string;
   session_id: string;

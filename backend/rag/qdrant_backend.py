@@ -116,6 +116,30 @@ class QdrantVectorBackend:
         chunks.sort(key=lambda chunk: chunk.score, reverse=True)
         return chunks
 
+    def delete_document_points(self, *, user_id: str, document_id: str) -> None:
+        """Remove all vector points for one user's document."""
+        if not user_id.strip():
+            raise ValueError("user_id must not be empty")
+        if not document_id.strip():
+            raise ValueError("document_id must not be empty")
+
+        if not self.client.collection_exists(self.collection_name):
+            return
+
+        point_filter = _Models.Filter(
+            must=[
+                _Models.FieldCondition(
+                    key="user_id",
+                    match=_Models.MatchValue(value=user_id),
+                ),
+                _Models.FieldCondition(
+                    key="document_id",
+                    match=_Models.MatchValue(value=document_id),
+                ),
+            ]
+        )
+        self.client.delete(collection_name=self.collection_name, points_selector=point_filter)
+
     def _ensure_collection(self, *, vector_size: int) -> None:
         if self._collection_ready:
             return

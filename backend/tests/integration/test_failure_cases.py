@@ -17,12 +17,18 @@ def _client() -> httpx.AsyncClient:
 
 class FakeQdrantVectorBackend:
     points = []
+    deleted = []
     fail = False
 
     def upsert_points(self, points):
         if self.fail:
             raise RuntimeError("qdrant unavailable")
         self.points.extend(points)
+
+    def delete_document_points(self, *, user_id, document_id):
+        if self.fail:
+            raise RuntimeError("qdrant unavailable")
+        self.deleted.append({"user_id": user_id, "document_id": document_id})
 
 
 async def test_ingest_rejects_unsupported_file_type() -> None:
@@ -117,6 +123,62 @@ async def test_ingest_persists_document_row_with_storage_path(monkeypatch) -> No
     assert response.status_code == 200
     assert documents[0]["id"] == payload["document_id"]
     assert documents[0]["storage_path"] == f"00000000-0000-0000-0000-000000000001/{payload['document_id']}/source.txt"
+
+
+async def test_delete_document_removes_qdrant_points_and_document(monkeypatch) -> None:
+    FakeQdrantVectorBackend.points = []
+    FakeQdrantVectorBackend.deleted = []
+    FakeQdrantVectorBackend.fail = False
+    monkeypatch.setattr(ingest_router, "QdrantVectorBackend", FakeQdrantVectorBackend)
+    monkeypatch.setattr(
+        ingest_router,
+        "ingest_document",
+        lambda file_path, file_type: {
+            "chunks": [
+                {
+                    "chunk_index": 0,
+                    "content": "hello",
+                    "embedding": [0.1],
+                    "metadata": {"source_type": file_type},
+                }
+            ]
+        },
+    )
+
+    async with _client() as client:
+        upload_response = await client.post(
+            "/ingest",
+            files={"file": ("delete-me.txt", b"hello", "text/plain")},
+        )
+        document_id = upload_response.json()["document_id"]
+        repository = SupabaseRepository()
+        repository.insert_chunks(
+            document_id=document_id,
+            chunks=[
+                {
+                    "chunk_index": 0,
+                    "content": "legacy hello",
+                    "embedding": [0.1],
+                    "metadata": {"source_type": "txt"},
+                }
+            ],
+        )
+        delete_response = await client.delete(f"/ingest/documents/{document_id}")
+
+    repository = SupabaseRepository()
+    documents = repository.list_documents(user_id="00000000-0000-0000-0000-000000000001")
+    legacy_chunks = repository.search_chunks(
+        user_id="00000000-0000-0000-0000-000000000001",
+        query_embedding=[0.1],
+    )
+    assert upload_response.status_code == 200
+    assert delete_response.status_code == 200
+    assert delete_response.json() == {"ok": True}
+    assert FakeQdrantVectorBackend.deleted == [
+        {"user_id": "00000000-0000-0000-0000-000000000001", "document_id": document_id}
+    ]
+    assert documents == []
+    assert legacy_chunks == []
 
 
 async def test_ingest_returns_503_when_storage_upload_fails(monkeypatch) -> None:

@@ -60,6 +60,11 @@ class DocumentDownloadResponse(BaseModel):
     expires_in_seconds: int
 
 
+class DeleteDocumentResponse(BaseModel):
+    """Acknowledgement for a deleted document."""
+    ok: bool
+
+
 _INGEST_IDEMPOTENCY_CACHE: OrderedDict[str, tuple[float, IngestResponse]] = OrderedDict()
 
 
@@ -423,6 +428,77 @@ async def list_documents(
         )
         raise HTTPException(status_code=503, detail="Document listing temporarily unavailable") from error
     return [DocumentListItem(**row) for row in rows]
+
+
+@router.delete("/documents/{document_id}", response_model=DeleteDocumentResponse, responses={403: {}, 404: {}, 503: {}})
+async def delete_document(
+    document_id: str,
+    request: Request,
+    auth_user: AuthUser = Depends(get_current_user),
+) -> DeleteDocumentResponse:
+    """Delete a document, its source object, and its indexed vector points."""
+    request_id = getattr(request.state, "request_id", "unknown")
+    observer = observability.get_observability()
+    try:
+        repository = SupabaseRepository()
+        document = repository.get_document(user_id=auth_user.user_id, document_id=document_id)
+        if document is None:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        QdrantVectorBackend().delete_document_points(user_id=auth_user.user_id, document_id=document_id)
+        repository.delete_document(user_id=auth_user.user_id, document_id=document_id)
+        observer.record_trace_event(
+            event_name="ingest_document_deleted",
+            request_id=request_id,
+            user_id=auth_user.user_id,
+            route="/ingest/documents/{document_id}",
+            component="ingest_router",
+            status="success",
+            metadata={"document_id": document_id, "storage_path": document.get("storage_path")},
+        )
+    except HTTPException:
+        raise
+    except PermissionError as error:
+        observer.record_trace_event(
+            event_name="ingest_document_delete_permission_failed",
+            request_id=request_id,
+            user_id=auth_user.user_id,
+            route="/ingest/documents/{document_id}",
+            component="ingest_router",
+            level="WARNING",
+            status="failed",
+            metadata={"document_id": document_id},
+            error=error,
+        )
+        raise HTTPException(status_code=403, detail=str(error)) from error
+    except DocumentStorageError as error:
+        observer.record_trace_event(
+            event_name="ingest_document_delete_storage_failed",
+            request_id=request_id,
+            user_id=auth_user.user_id,
+            route="/ingest/documents/{document_id}",
+            component="supabase_storage",
+            level="ERROR",
+            status="failed",
+            metadata={"document_id": document_id},
+            error=error,
+        )
+        raise HTTPException(status_code=503, detail="Document storage temporarily unavailable") from error
+    except Exception as error:
+        logger.exception("ingest_document_delete_failed", extra={"request_id": request_id, "document_id": document_id})
+        observer.record_trace_event(
+            event_name="ingest_document_delete_failed",
+            request_id=request_id,
+            user_id=auth_user.user_id,
+            route="/ingest/documents/{document_id}",
+            component="ingest_router",
+            level="ERROR",
+            status="failed",
+            metadata={"document_id": document_id},
+            error=error,
+        )
+        raise HTTPException(status_code=503, detail="Document deletion temporarily unavailable") from error
+    return DeleteDocumentResponse(ok=True)
 
 
 @router.get("/documents/{document_id}/download", response_model=DocumentDownloadResponse, responses={403: {}, 503: {}})

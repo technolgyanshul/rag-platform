@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { ProtectedPage } from "../../components/auth/ProtectedPage";
 import { UploadPanel } from "../../components/knowledge/UploadPanel";
 import { AppShell } from "../../components/layout/AppShell";
-import { DocumentRow, getDocumentDownloadUrl, listKnowledgeDocuments, logUiEvent } from "../../lib/api";
+import { deleteKnowledgeDocument, DocumentRow, getDocumentDownloadUrl, listKnowledgeDocuments, logUiEvent } from "../../lib/api";
 
 function documentStatus(document: DocumentRow): { label: string; className: string; title?: string } {
   if (document.index_status === "indexed") {
@@ -24,6 +24,7 @@ function documentStatus(document: DocumentRow): { label: string; className: stri
 export default function KnowledgePage() {
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [message, setMessage] = useState("Upload a document to populate the demo knowledge base.");
+  const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
 
   const refreshDocuments = async () => {
     try {
@@ -89,6 +90,42 @@ export default function KnowledgePage() {
     }
   };
 
+  const handleDelete = async (document: DocumentRow) => {
+    const confirmed = window.confirm(`Delete ${document.filename}? This removes it from future retrieval.`);
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingDocumentId(document.id);
+    try {
+      await deleteKnowledgeDocument(document.id);
+      await logUiEvent({
+        event_name: "document_delete_success",
+        page: "/knowledge",
+        component: "KnowledgePage",
+        action: "delete_document",
+        payload: { document_id: document.id, filename: document.filename },
+      }).catch((eventError: unknown) => {
+        console.error("Failed to log document delete success event", eventError);
+      });
+      setMessage("Document deleted.");
+      await refreshDocuments();
+    } catch (error) {
+      await logUiEvent({
+        event_name: "document_delete_failure",
+        page: "/knowledge",
+        component: "KnowledgePage",
+        action: "delete_document",
+        payload: { document_id: document.id, filename: document.filename, error: error instanceof Error ? error.message : String(error) },
+      }).catch((eventError: unknown) => {
+        console.error("Failed to log document delete failure event", eventError);
+      });
+      setMessage(error instanceof Error ? error.message : "Could not delete document.");
+    } finally {
+      setDeletingDocumentId(null);
+    }
+  };
+
   return (
     <ProtectedPage>
       <AppShell
@@ -131,6 +168,7 @@ export default function KnowledgePage() {
                     <th>Status</th>
                     <th>Uploaded</th>
                     <th>Source</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -153,6 +191,16 @@ export default function KnowledgePage() {
                       <td>
                         <button type="button" onClick={() => void handleDownload(document.id)}>
                           Open file
+                        </button>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="button-danger"
+                          disabled={deletingDocumentId === document.id}
+                          onClick={() => void handleDelete(document)}
+                        >
+                          {deletingDocumentId === document.id ? "Deleting..." : "Delete"}
                         </button>
                       </td>
                     </tr>

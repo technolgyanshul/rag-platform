@@ -758,6 +758,66 @@ class SupabaseRepository:
 
         raise PermissionError(DOCUMENT_ACCESS_ERROR_MESSAGE)
 
+    def get_document(self, user_id: str, document_id: str) -> dict[str, Any] | None:
+        workspace_id = self._ensure_workspace(user_id)
+        if self._client:
+            result = (
+                self._client.table("documents")
+                .select("*")
+                .eq("id", document_id)
+                .limit(1)
+                .execute()
+            )
+            if not result.data:
+                return None
+            row = result.data[0]
+            if str(row.get("team_id", "")) != workspace_id:
+                raise PermissionError(DOCUMENT_ACCESS_ERROR_MESSAGE)
+            return row
+
+        for document in _FALLBACK.documents:
+            if document.get("id") != document_id:
+                continue
+            if document.get("team_id") != workspace_id:
+                raise PermissionError(DOCUMENT_ACCESS_ERROR_MESSAGE)
+            return document
+        return None
+
+    def delete_document(self, user_id: str, document_id: str) -> None:
+        workspace_id = self._ensure_workspace(user_id)
+        document = self.get_document(user_id=user_id, document_id=document_id)
+        if document is None:
+            raise PermissionError(DOCUMENT_ACCESS_ERROR_MESSAGE)
+
+        storage_path = document.get("storage_path")
+        if self._client:
+            if storage_path:
+                try:
+                    self._client.storage.from_("knowledge-files").remove([storage_path])
+                except Exception as exc:
+                    raise DocumentStorageError("Failed to delete source file from storage") from exc
+
+            result = (
+                self._client.table("documents")
+                .delete()
+                .eq("id", document_id)
+                .eq("team_id", workspace_id)
+                .execute()
+            )
+            if not result.data:
+                raise PermissionError(DOCUMENT_ACCESS_ERROR_MESSAGE)
+            return
+
+        before_count = len(_FALLBACK.documents)
+        _FALLBACK.documents = [
+            row
+            for row in _FALLBACK.documents
+            if not (row.get("id") == document_id and row.get("team_id") == workspace_id)
+        ]
+        if len(_FALLBACK.documents) == before_count:
+            raise PermissionError(DOCUMENT_ACCESS_ERROR_MESSAGE)
+        _FALLBACK.chunks = [row for row in _FALLBACK.chunks if row.get("document_id") != document_id]
+
     def insert_chunks(self, document_id: str, chunks: list[dict[str, Any]]) -> None:
         rows = []
         for chunk in chunks:
