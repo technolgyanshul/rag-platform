@@ -23,6 +23,7 @@ const navItems: NavItem[] = [
   { href: "/profile", label: "Profile", icon: "account_circle" },
 ];
 
+/** Shared authenticated shell with sidebar, header, and page content container. */
 export function AppShell({ title, subtitle, actions, children }: AppShellProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);

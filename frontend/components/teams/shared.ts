@@ -1,3 +1,4 @@
+/** Shared team/agent form types and defaults used across team pages. */
 import { CollaborationRule } from "../../lib/types";
 
 export type TeamFormState = {

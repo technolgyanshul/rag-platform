@@ -8,6 +8,7 @@ import { AppShell } from "../../components/layout/AppShell";
 import { listTeams, logUiEvent } from "../../lib/api";
 import { Team } from "../../lib/types";
 
+/** Teams overview page with navigation into team editors. */
 export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [status, setStatus] = useState<string>("Loading teams...");

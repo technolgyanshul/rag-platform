@@ -15,6 +15,7 @@ function formatJson(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
+/** Session detail page showing full query timeline, traces, and export action. */
 export default function SessionDetailPage() {
   const params = useParams<{ session_id: string }>();
   const sessionId = useMemo(() => params?.session_id ?? "", [params]);

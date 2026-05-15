@@ -11,6 +11,7 @@ import { AppShell } from "../../components/layout/AppShell";
 import { createSession, listTeamAgents, listTeams, logUiEvent, runQuery } from "../../lib/api";
 import { Agent, QueryResponse, QueryUiState, Team } from "../../lib/types";
 
+/** Chat workspace for team-scoped multi-agent query execution. */
 export default function ChatPage() {
   const [queryState, setQueryState] = useState<QueryUiState>({ status: "idle" });
   const [teams, setTeams] = useState<Team[]>([]);

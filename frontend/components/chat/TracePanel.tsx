@@ -50,6 +50,7 @@ function citationLabel(citation: Record<string, unknown>, sources: readonly Sour
   return "Citation";
 }
 
+/** Renders per-agent traces with output preview and citation linkage. */
 export function TracePanel({ traces, sources, fullOutput = false }: TracePanelProps) {
   if (traces.length === 0) {
     return <p className="status-message">No agent traces returned for this answer.</p>;

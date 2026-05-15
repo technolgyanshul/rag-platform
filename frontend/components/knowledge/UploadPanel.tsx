@@ -8,6 +8,7 @@ type UploadPanelProps = {
   onUploaded: () => Promise<void> | void;
 };
 
+/** Handles file selection/upload and emits refresh callback on success. */
 export function UploadPanel({ onUploaded }: UploadPanelProps) {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);

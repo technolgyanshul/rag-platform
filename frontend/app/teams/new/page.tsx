@@ -8,6 +8,7 @@ import { AppShell } from "../../../components/layout/AppShell";
 import { createTeam } from "../../../lib/api";
 import { COLLAB_RULES, TeamFormState } from "../../../components/teams/shared";
 
+/** Team creation page that seeds a new team then redirects to editor. */
 export default function NewTeamPage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);

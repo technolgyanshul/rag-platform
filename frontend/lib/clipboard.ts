@@ -16,6 +16,7 @@ function isSelectableField(value: unknown): value is SelectableField {
   );
 }
 
+/** Returns only currently selected text from active input/textarea-like fields. */
 export function fieldOnlyClipboardText(activeElement: unknown): string | null {
   if (!isSelectableField(activeElement)) {
     return null;

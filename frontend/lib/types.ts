@@ -1,3 +1,4 @@
+/** Frontend type contracts shared across pages, components, and API calls. */
 export type Source = {
   document_id: string;
   filename: string;

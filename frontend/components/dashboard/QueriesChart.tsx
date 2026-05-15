@@ -4,6 +4,7 @@ type QueriesChartProps = Readonly<{
   metrics: DashboardMetrics | null;
 }>;
 
+/** Renders query volume trend by day from dashboard metrics payload. */
 export function QueriesChart({ metrics }: QueriesChartProps) {
   if (!metrics || metrics.queries_over_time.length === 0) {
     return <p className="status-message">No chart data available yet.</p>;

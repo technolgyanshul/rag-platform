@@ -22,6 +22,7 @@ import {
 import { Agent, ProviderModels, Team } from "../../../lib/types";
 import { AgentFormState, COLLAB_RULES, DEFAULT_AGENT_FORM, TeamFormState } from "../../../components/teams/shared";
 
+/** Team editor page for updating team settings and agent configuration. */
 export default function TeamDetailPage() {
   const params = useParams<{ id: string }>();
   const teamId = params.id;

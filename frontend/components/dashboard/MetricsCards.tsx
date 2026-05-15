@@ -4,6 +4,7 @@ type MetricsCardsProps = Readonly<{
   metrics: DashboardMetrics | null;
 }>;
 
+/** Shows top-level dashboard KPI cards for one session window. */
 export function MetricsCards({ metrics }: MetricsCardsProps) {
   if (!metrics) {
     return <p className="status-message">Load a session to view metrics.</p>;

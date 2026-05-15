@@ -24,6 +24,7 @@ function formatContribution(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/** Displays deterministic quality scores returned by the backend scorecard. */
 export function ScoreCard({ scorecard }: ScoreCardProps) {
   const contributions = Object.entries(scorecard.model_contribution_breakdown ?? {});
 

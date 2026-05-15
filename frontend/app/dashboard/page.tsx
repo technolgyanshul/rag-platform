@@ -9,6 +9,7 @@ import { AppShell } from "../../components/layout/AppShell";
 import { getDashboardMetrics, logUiEvent } from "../../lib/api";
 import { DashboardMetrics } from "../../lib/types";
 
+/** Dashboard page for session telemetry and trend exploration. */
 export default function DashboardPage() {
   const [sessionId, setSessionId] = useState("");
   const [days, setDays] = useState(7);

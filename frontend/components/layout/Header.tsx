@@ -2,6 +2,7 @@ type HeaderProps = {
   onMenuClick?: () => void;
 };
 
+/** Top app header with mobile menu trigger and branding. */
 export function Header({ onMenuClick }: HeaderProps) {
   return (
     <header className="top-bar">

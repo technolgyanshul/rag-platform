@@ -5,6 +5,7 @@ type ChatWindowProps = Readonly<{
   queryState: QueryUiState;
 }>;
 
+/** Renders the assistant response, traces, citations, and scorecard sections. */
 export function ChatWindow({ queryState }: ChatWindowProps) {
   if (queryState.status === "idle") {
     return <p className="status-message">Run a query to view the answer and supporting sources.</p>;

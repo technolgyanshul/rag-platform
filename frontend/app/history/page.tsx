@@ -8,6 +8,7 @@ import { AppShell } from "../../components/layout/AppShell";
 import { listSessions, logUiEvent } from "../../lib/api";
 import { SessionListItem } from "../../lib/types";
 
+/** Session history list with quick navigation into detail views. */
 export default function HistoryPage() {
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
   const [message, setMessage] = useState("Loading sessions...");

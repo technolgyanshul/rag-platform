@@ -7,6 +7,7 @@ import { ProtectedPage } from "../../components/auth/ProtectedPage";
 import { AppShell } from "../../components/layout/AppShell";
 import { createClient } from "@/utils/supabase/client";
 
+/** Profile page for current authenticated user and logout action. */
 export default function ProfilePage() {
   const router = useRouter();
   const [email, setEmail] = useState<string>("");

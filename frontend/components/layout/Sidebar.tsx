@@ -13,6 +13,7 @@ type SidebarProps = {
   mobile?: boolean;
 };
 
+/** Sidebar navigation used in desktop and mobile variants. */
 export function Sidebar({ navItems, activePath, onNavigate, mobile = false }: SidebarProps) {
   return (
     <aside className={`side-nav${mobile ? " side-nav--mobile" : ""}`}>

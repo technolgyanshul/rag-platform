@@ -33,6 +33,7 @@ export const metadata: Metadata = {
   description: "Operator console for RAG workflows"
 };
 
+/** Global app layout applying local fonts and baseline HTML structure. */
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">

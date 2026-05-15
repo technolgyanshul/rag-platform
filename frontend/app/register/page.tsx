@@ -6,6 +6,7 @@ import { FormEvent, useState } from "react";
 
 import { createClient } from "@/utils/supabase/client";
 
+/** Registration screen for creating a Supabase-backed operator account. */
 export default function RegisterPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");

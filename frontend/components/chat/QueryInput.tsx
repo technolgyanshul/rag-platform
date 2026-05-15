@@ -9,6 +9,7 @@ type QueryInputProps = Readonly<{
   disabledReason?: string;
 }>;
 
+/** Collects query text and optional team/session overrides before submission. */
 export function QueryInput({ onSubmit, onCreateSession, disabled = false, disabledReason }: QueryInputProps) {
   const [sessionId, setSessionId] = useState("");
   const [query, setQuery] = useState("");

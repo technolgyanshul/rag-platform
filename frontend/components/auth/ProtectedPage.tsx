@@ -9,6 +9,7 @@ type ProtectedPageProps = Readonly<{
   children: React.ReactNode;
 }>;
 
+/** Redirects unauthenticated users and renders children only after auth is ready. */
 export function ProtectedPage({ children }: ProtectedPageProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);

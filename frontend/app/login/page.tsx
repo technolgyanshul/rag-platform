@@ -6,6 +6,7 @@ import { FormEvent, useState } from "react";
 
 import { createClient } from "@/utils/supabase/client";
 
+/** Login screen for existing users using Supabase password auth. */
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");

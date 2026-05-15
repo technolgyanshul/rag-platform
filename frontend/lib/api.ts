@@ -77,6 +77,7 @@ export type UiEventPayload = {
   client_timestamp?: string;
 };
 
+/** Captures lightweight browser context for observability payloads. */
 function browserMetadata(): Record<string, unknown> {
   if (typeof window === "undefined") {
     return {};
@@ -224,6 +225,7 @@ export async function getSessionDetail(sessionId: string): Promise<SessionDetail
   return response.json();
 }
 
+/** Extracts a download filename from a Content-Disposition header value. */
 function exportFilenameFromDisposition(value: string | null): string | null {
   if (!value) {
     return null;
@@ -428,6 +430,7 @@ export async function listProviderModels(): Promise<ProviderModels> {
   return response.json();
 }
 
+/** Normalizes heterogeneous API error bodies into a user-facing message. */
 function parseApiErrorMessage(errorBody: unknown, fallback: string): string {
   if (errorBody && typeof errorBody === "object") {
     const detail = (errorBody as { detail?: unknown }).detail;

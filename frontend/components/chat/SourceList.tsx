@@ -4,6 +4,7 @@ type SourceListProps = Readonly<{
   sources: readonly Source[];
 }>;
 
+/** Lists retrieved source previews attached to a response. */
 export function SourceList({ sources }: SourceListProps) {
   if (sources.length === 0) {
     return <p className="status-message">No sources available for this answer.</p>;

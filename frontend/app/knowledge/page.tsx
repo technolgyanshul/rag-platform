@@ -20,6 +20,7 @@ function documentStatus(document: DocumentRow): { label: string; className: stri
   return { label: "legacy", className: "badge", title: "Not indexed in Qdrant" };
 }
 
+/** Knowledge base page for document upload, status, and source download links. */
 export default function KnowledgePage() {
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [message, setMessage] = useState("Upload a document to populate the demo knowledge base.");
