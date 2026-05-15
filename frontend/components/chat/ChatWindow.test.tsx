@@ -44,4 +44,24 @@ describe("ChatWindow", () => {
     expect(html).toContain("9/10");
     expect(html).toContain("Grounded final response.");
   });
+
+  it("renders reasoning below the final answer", () => {
+    const html = renderToStaticMarkup(
+      <ChatWindow
+        queryState={{
+          status: "success",
+          data: {
+            ...response,
+            reasoning: "Reasoning details.",
+          },
+        }}
+      />,
+    );
+
+    const finalHeadingIndex = html.indexOf("Final Answer");
+    const reasoningHeadingIndex = html.indexOf("Reasoning");
+
+    expect(finalHeadingIndex).toBeGreaterThanOrEqual(0);
+    expect(reasoningHeadingIndex).toBeGreaterThan(finalHeadingIndex);
+  });
 });

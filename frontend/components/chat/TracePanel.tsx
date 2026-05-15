@@ -3,6 +3,8 @@ import { AgentTrace, Source } from "../../lib/types";
 type TracePanelProps = Readonly<{
   traces: readonly AgentTrace[];
   sources: readonly Source[];
+  retrievalCount?: number;
+  insufficientContext?: boolean;
   fullOutput?: boolean;
 }>;
 
@@ -51,9 +53,21 @@ function citationLabel(citation: Record<string, unknown>, sources: readonly Sour
 }
 
 /** Renders per-agent traces with output preview and citation linkage. */
-export function TracePanel({ traces, sources, fullOutput = false }: TracePanelProps) {
+export function TracePanel({
+  traces,
+  sources,
+  retrievalCount,
+  insufficientContext,
+  fullOutput = false,
+}: TracePanelProps) {
   if (traces.length === 0) {
-    return <p className="status-message">No agent traces returned for this answer.</p>;
+    return (
+      <p className="status-message">
+        {insufficientContext && (retrievalCount ?? 0) === 0
+          ? "No agent traces because retrieval returned 0 source chunks for this query."
+          : "No agent traces returned for this answer."}
+      </p>
+    );
   }
 
   return (

@@ -162,22 +162,64 @@ class SupabaseRepository:
             raise PermissionError(TEAM_ACCESS_ERROR_MESSAGE)
         return team
 
-    def _seed_default_agents(self, user_id: str, team_id: str) -> None:
-        if self.team_has_agents(user_id=user_id, team_id=team_id):
-            return
+    @staticmethod
+    def _is_supabase_bad_request(error: Exception) -> bool:
+        """Detect PostgREST 400 responses so routers can return validation errors."""
+        message = str(error)
+        return "400 Bad Request" in message or "HTTP/2 400" in message or "HTTP/1.1 400" in message
+
+    def _seed_default_agents(self, user_id: str, team_id: str) -> dict[str, Any]:
+        existing_names = {
+            str(row.get("name", "")).strip().lower()
+            for row in self.list_agents(user_id=user_id, team_id=team_id)
+        }
+        report: dict[str, Any] = {
+            "attempted": len(DEFAULT_TEAM_AGENTS),
+            "created": 0,
+            "failed": 0,
+            "skipped_existing": 0,
+            "errors": [],
+        }
 
         for template in DEFAULT_TEAM_AGENTS:
-            self.create_agent(
-                user_id=user_id,
-                team_id=team_id,
-                name=str(template["name"]),
-                role=str(template["role"]),
-                system_prompt=str(template["system_prompt"]),
-                model_provider=str(template["model_provider"]),
-                model_name=str(template["model_name"]),
-                response_style=str(template["response_style"]),
-                execution_order=int(template["execution_order"]),
-            )
+            agent_name = str(template["name"])
+            normalized_name = agent_name.strip().lower()
+            if normalized_name in existing_names:
+                report["skipped_existing"] = int(report["skipped_existing"]) + 1
+                continue
+            try:
+                self.create_agent(
+                    user_id=user_id,
+                    team_id=team_id,
+                    name=agent_name,
+                    role=str(template["role"]),
+                    system_prompt=str(template["system_prompt"]),
+                    model_provider=str(template["model_provider"]),
+                    model_name=str(template["model_name"]),
+                    response_style=str(template["response_style"]),
+                    execution_order=int(template["execution_order"]),
+                )
+                existing_names.add(normalized_name)
+                report["created"] = int(report["created"]) + 1
+            except Exception as error:
+                report["failed"] = int(report["failed"]) + 1
+                cast_errors = report["errors"]
+                if isinstance(cast_errors, list):
+                    cast_errors.append({"agent_name": agent_name, "error": str(error)})
+                logger.exception(
+                    "default_agent_seed_failed",
+                    extra={
+                        "user_id": user_id,
+                        "team_id": team_id,
+                        "agent_name": agent_name,
+                        "error": str(error),
+                    },
+                )
+        return report
+
+    def seed_default_agents(self, user_id: str, team_id: str) -> dict[str, Any]:
+        self._ensure_team_owned(user_id=user_id, team_id=team_id)
+        return self._seed_default_agents(user_id=user_id, team_id=team_id)
 
     def _find_fallback_session(self, session_id: str) -> dict[str, Any] | None:
         for row in _FALLBACK.sessions:
@@ -305,13 +347,18 @@ class SupabaseRepository:
         }
 
         if self._client:
-            result = self._client.table("teams").insert(payload).execute()
+            try:
+                result = self._client.table("teams").insert(payload).execute()
+            except Exception as error:
+                if self._is_supabase_bad_request(error):
+                    raise ValueError(str(error)) from error
+                raise
             if not result.data:
                 raise RuntimeError("Failed to create team")
             row = result.data[0]
             created_team_id = str(row.get("id", payload["id"]))
             if seed_default_agents:
-                self._seed_default_agents(user_id=user_id, team_id=created_team_id)
+                row["_seed_report"] = self._seed_default_agents(user_id=user_id, team_id=created_team_id)
             return row
 
         existing = self._find_fallback_team(payload["id"])
@@ -322,7 +369,7 @@ class SupabaseRepository:
 
         _FALLBACK.teams.append(payload)
         if seed_default_agents:
-            self._seed_default_agents(user_id=user_id, team_id=payload["id"])
+            payload["_seed_report"] = self._seed_default_agents(user_id=user_id, team_id=payload["id"])
         return payload
 
     def update_team(self, user_id: str, team_id: str, **updates: Any) -> dict[str, Any]:
@@ -432,7 +479,12 @@ class SupabaseRepository:
         }
 
         if self._client:
-            result = self._client.table("agents").insert(payload).execute()
+            try:
+                result = self._client.table("agents").insert(payload).execute()
+            except Exception as error:
+                if self._is_supabase_bad_request(error):
+                    raise ValueError(str(error)) from error
+                raise
             if result.data:
                 return result.data[0]
             raise RuntimeError("Failed to create agent")

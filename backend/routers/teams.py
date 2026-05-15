@@ -70,6 +70,26 @@ class TeamResponse(BaseModel):
     created_at: str
 
 
+class SeedErrorResponse(BaseModel):
+    """Single default-agent seeding failure detail."""
+    agent_name: str
+    error: str
+
+
+class SeedReportResponse(BaseModel):
+    """Result summary for default-agent seeding operations."""
+    attempted: int
+    created: int
+    failed: int
+    skipped_existing: int
+    errors: list[SeedErrorResponse]
+
+
+class TeamCreateResponse(TeamResponse):
+    """Team create response including default-agent seed outcome."""
+    seed_report: SeedReportResponse | None = None
+
+
 class AgentCreateRequest(BaseModel):
     """Payload for creating a team agent."""
     name: str = Field(min_length=1, max_length=120)
@@ -142,6 +162,31 @@ def _normalize_agent_payload(row: dict[str, Any]) -> AgentResponse:
     )
 
 
+def _normalize_seed_report(payload: Any) -> SeedReportResponse | None:
+    """Convert repository seed report payload into response model."""
+    if not isinstance(payload, dict):
+        return None
+
+    raw_errors = payload.get("errors")
+    errors: list[SeedErrorResponse] = []
+    if isinstance(raw_errors, list):
+        for item in raw_errors:
+            if isinstance(item, dict):
+                errors.append(
+                    SeedErrorResponse(
+                        agent_name=str(item.get("agent_name", "")),
+                        error=str(item.get("error", "")),
+                    )
+                )
+    return SeedReportResponse(
+        attempted=int(payload.get("attempted", 0)),
+        created=int(payload.get("created", 0)),
+        failed=int(payload.get("failed", 0)),
+        skipped_existing=int(payload.get("skipped_existing", 0)),
+        errors=errors,
+    )
+
+
 def _ensure_owned_team(repository: SupabaseRepository, user_id: str, team_id: str) -> dict[str, Any]:
     """Load a team and raise HTTP errors when access is denied or missing."""
     try:
@@ -160,6 +205,48 @@ def _normalize_collaboration_rule(value: str) -> str:
     if normalized not in _COLLABORATION_RULES:
         raise HTTPException(status_code=400, detail="Unsupported collaboration_rule")
     return normalized
+
+
+def _http_for_agent_repository_error(error: Exception) -> HTTPException:
+    """Map repository/supabase errors to actionable HTTP responses for agent endpoints."""
+    message = str(error)
+    status_value = getattr(error, "status_code", None) or getattr(error, "status", None) or getattr(error, "http_status_code", None)
+    try:
+        status_code = int(status_value) if status_value is not None else None
+    except Exception:
+        status_code = None
+    if status_code is not None and 400 <= status_code < 500:
+        return HTTPException(status_code=status_code, detail=message or repr(error))
+    if "400 Bad Request" in message or "HTTP/2 400" in message or "HTTP/1.1 400" in message:
+        return HTTPException(status_code=400, detail=message)
+    if "403 Forbidden" in message or "HTTP/2 403" in message or "HTTP/1.1 403" in message:
+        return HTTPException(status_code=403, detail=message)
+    if "404 Not Found" in message or "HTTP/2 404" in message or "HTTP/1.1 404" in message:
+        return HTTPException(status_code=404, detail=message)
+    if error.__class__.__name__ in {"APIError", "PostgrestAPIError"}:
+        return HTTPException(status_code=400, detail=message or repr(error))
+    return HTTPException(status_code=503, detail="Agent service temporarily unavailable")
+
+
+def _http_for_team_repository_error(error: Exception) -> HTTPException:
+    """Map repository/supabase errors to actionable HTTP responses for team endpoints."""
+    message = str(error)
+    status_value = getattr(error, "status_code", None) or getattr(error, "status", None) or getattr(error, "http_status_code", None)
+    try:
+        status_code = int(status_value) if status_value is not None else None
+    except Exception:
+        status_code = None
+    if status_code is not None and 400 <= status_code < 500:
+        return HTTPException(status_code=status_code, detail=message or repr(error))
+    if "400 Bad Request" in message or "HTTP/2 400" in message or "HTTP/1.1 400" in message:
+        return HTTPException(status_code=400, detail=message)
+    if "403 Forbidden" in message or "HTTP/2 403" in message or "HTTP/1.1 403" in message:
+        return HTTPException(status_code=403, detail=message)
+    if "404 Not Found" in message or "HTTP/2 404" in message or "HTTP/1.1 404" in message:
+        return HTTPException(status_code=404, detail=message)
+    if error.__class__.__name__ in {"APIError", "PostgrestAPIError"}:
+        return HTTPException(status_code=400, detail=message or repr(error))
+    return HTTPException(status_code=503, detail="Team service temporarily unavailable")
 
 
 @router.get("/models", response_model=ModelsResponse, responses={503: {"description": "Model catalog temporarily unavailable"}})
@@ -258,8 +345,8 @@ async def list_teams(auth_user: AuthUser = Depends(get_current_user)) -> list[Te
     return [_normalize_team_payload(row) for row in rows]
 
 
-@router.post("", response_model=TeamResponse, responses={400: {"description": "Validation failed"}, 503: {"description": "Team service temporarily unavailable"}})
-async def create_team(payload: TeamCreateRequest, auth_user: AuthUser = Depends(get_current_user)) -> TeamResponse:
+@router.post("", response_model=TeamCreateResponse, responses={400: {"description": "Validation failed"}, 503: {"description": "Team service temporarily unavailable"}})
+async def create_team(payload: TeamCreateRequest, auth_user: AuthUser = Depends(get_current_user)) -> TeamCreateResponse:
     """Create a team for the authenticated user."""
     try:
         row = SupabaseRepository().create_team(
@@ -271,8 +358,31 @@ async def create_team(payload: TeamCreateRequest, auth_user: AuthUser = Depends(
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     except Exception as error:
+        raise _http_for_team_repository_error(error) from error
+    team_payload = _normalize_team_payload(row)
+    return TeamCreateResponse(**team_payload.model_dump(), seed_report=_normalize_seed_report(row.get("_seed_report")))
+
+
+@router.post(
+    "/{team_id}/seed-default-agents",
+    response_model=SeedReportResponse,
+    responses={403: {"description": "Forbidden"}, 404: {"description": "Not found"}, 503: {"description": "Team service temporarily unavailable"}},
+)
+async def seed_default_agents(team_id: str, auth_user: AuthUser = Depends(get_current_user)) -> SeedReportResponse:
+    """Retry default-agent seeding for an owned team and return detailed outcome."""
+    repository = SupabaseRepository()
+    _ensure_owned_team(repository=repository, user_id=auth_user.user_id, team_id=team_id)
+    try:
+        report = repository.seed_default_agents(user_id=auth_user.user_id, team_id=team_id)
+    except PermissionError as error:
+        raise HTTPException(status_code=403, detail=str(error)) from error
+    except Exception as error:
         raise HTTPException(status_code=503, detail="Team service temporarily unavailable") from error
-    return _normalize_team_payload(row)
+
+    normalized = _normalize_seed_report(report)
+    if normalized is None:
+        raise HTTPException(status_code=503, detail="Team service temporarily unavailable")
+    return normalized
 
 
 @router.get("/{team_id}", response_model=TeamResponse, responses={403: {"description": "Forbidden"}, 404: {"description": "Not found"}, 503: {"description": "Team service temporarily unavailable"}})
@@ -375,7 +485,7 @@ async def create_agent(team_id: str, payload: AgentCreateRequest, auth_user: Aut
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     except Exception as error:
-        raise HTTPException(status_code=503, detail="Agent service temporarily unavailable") from error
+        raise _http_for_agent_repository_error(error) from error
     return _normalize_agent_payload(row)
 
 
@@ -418,7 +528,7 @@ async def patch_agent(team_id: str, agent_id: str, payload: AgentPatchRequest, a
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     except Exception as error:
-        raise HTTPException(status_code=503, detail="Agent service temporarily unavailable") from error
+        raise _http_for_agent_repository_error(error) from error
     return _normalize_agent_payload(row)
 
 

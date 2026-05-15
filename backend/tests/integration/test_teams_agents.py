@@ -47,6 +47,39 @@ async def test_team_creation_and_openapi_paths() -> None:
         assert path in schema["paths"]
 
 
+async def test_team_creation_succeeds_when_default_agent_creation_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    from db.supabase import SupabaseRepository
+
+    def _raise_agent_error(self: SupabaseRepository, **_: object) -> dict:
+        raise RuntimeError("agent create failed")
+
+    monkeypatch.setattr(SupabaseRepository, "create_agent", _raise_agent_error)
+
+    async with _client() as client:
+        response = await client.post(
+            "/teams",
+            json={"name": "anshul's Team", "domain": "AI safety", "collaboration_rule": "sequential"},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["name"] == "anshul's Team"
+    assert payload["seed_report"]["failed"] >= 1
+
+
+async def test_retry_seed_default_agents_endpoint() -> None:
+    team = await _create_team()
+    team_id = team["id"]
+
+    async with _client() as client:
+        response = await client.post(f"/teams/{team_id}/seed-default-agents")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["failed"] == 0
+    assert payload["attempted"] == 3
+
+
 async def test_multiple_agents_with_different_models_and_patch_flow() -> None:
     team = await _create_team()
     team_id = team["id"]

@@ -296,6 +296,23 @@ export type TeamCreatePayload = {
   collaboration_rule?: CollaborationRule;
 };
 
+export type SeedError = {
+  agent_name: string;
+  error: string;
+};
+
+export type SeedReport = {
+  attempted: number;
+  created: number;
+  failed: number;
+  skipped_existing: number;
+  errors: SeedError[];
+};
+
+export type TeamCreateResult = Team & {
+  seed_report?: SeedReport | null;
+};
+
 export type TeamPatchPayload = Partial<TeamCreatePayload>;
 
 export type AgentCreatePayload = {
@@ -328,7 +345,7 @@ export async function listTeams(): Promise<Team[]> {
   return response.json();
 }
 
-export async function createTeam(payload: TeamCreatePayload): Promise<Team> {
+export async function createTeam(payload: TeamCreatePayload): Promise<TeamCreateResult> {
   const response = await fetch(`${API_BASE_URL}/teams`, {
     method: "POST",
     headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
@@ -337,6 +354,18 @@ export async function createTeam(payload: TeamCreatePayload): Promise<Team> {
   if (!response.ok) {
     const errorBody = await response.json().catch(() => null);
     throw new Error(errorBody?.detail ?? "Could not create team");
+  }
+  return response.json();
+}
+
+export async function retrySeedDefaultAgents(teamId: string): Promise<SeedReport> {
+  const response = await fetch(`${API_BASE_URL}/teams/${encodeURIComponent(teamId)}/seed-default-agents`, {
+    method: "POST",
+    headers: await buildAuthHeaders(),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.detail ?? "Could not seed default agents");
   }
   return response.json();
 }

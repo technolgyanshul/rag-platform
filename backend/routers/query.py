@@ -175,6 +175,13 @@ def _serialize_json_list(items: list[Any]) -> list[dict[str, Any]]:
     return serialized
 
 
+def _documents_indexed_without_hits(documents: list[dict[str, Any]]) -> bool:
+    """Detect when docs exist but retrieval returned no chunks from the active index."""
+    if not documents:
+        return False
+    return any(str(document.get("index_status", "")).strip().lower() == "indexed" for document in documents)
+
+
 @router.post(
     "",
     response_model=QueryResponse,
@@ -321,10 +328,20 @@ async def run_query(payload: QueryRequest, request: Request, auth_user: AuthUser
         raise HTTPException(status_code=503, detail="Retrieval temporarily unavailable") from error
 
     if not sources:
-        final_answer = (
-            "Insufficient context to answer from uploaded documents. "
-            "Please upload more relevant files or rephrase the query."
-        )
+        try:
+            documents = repository.list_documents(user_id=auth_user.user_id)
+        except Exception:
+            documents = []
+        if _documents_indexed_without_hits(documents):
+            final_answer = (
+                "No retrieval results were returned from the active vector index, even though documents are indexed. "
+                "Please re-index or re-upload documents for this workspace."
+            )
+        else:
+            final_answer = (
+                "Insufficient context to answer from uploaded documents. "
+                "Please upload more relevant files or rephrase the query."
+            )
         retrieval_metadata = {
             "embedding_model_version": settings.embedanything_model,
             "index_version": settings.index_version,

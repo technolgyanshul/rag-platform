@@ -48,6 +48,8 @@ export default function LoginPage() {
           <input
             id="email"
             type="email"
+            autoComplete="username"
+            suppressHydrationWarning
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
@@ -57,6 +59,8 @@ export default function LoginPage() {
           <input
             id="password"
             type="password"
+            autoComplete="current-password"
+            suppressHydrationWarning
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             required

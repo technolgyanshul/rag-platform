@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { ProtectedPage } from "../../../components/auth/ProtectedPage";
 import { AppShell } from "../../../components/layout/AppShell";
-import { createTeam } from "../../../lib/api";
+import { createTeam, retrySeedDefaultAgents } from "../../../lib/api";
 import { COLLAB_RULES, TeamFormState } from "../../../components/teams/shared";
 
 /** Team creation page that seeds a new team then redirects to editor. */
@@ -13,6 +13,8 @@ export default function NewTeamPage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
+  const [createdTeamId, setCreatedTeamId] = useState<string | null>(null);
+  const [retryingSeed, setRetryingSeed] = useState(false);
   const [form, setForm] = useState<TeamFormState>({
     name: "",
     domain: "",
@@ -31,11 +33,35 @@ export default function NewTeamPage() {
         domain: form.domain.trim() || null,
         collaboration_rule: form.collaboration_rule,
       });
+      if ((created.seed_report?.failed ?? 0) > 0) {
+        setCreatedTeamId(created.id);
+        setStatus("Team created, but default agents could not be fully seeded. Retry seeding or continue to team editor.");
+        return;
+      }
       router.push(`/teams/${created.id}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not create team");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const onRetrySeeding = async () => {
+    if (!createdTeamId) {
+      return;
+    }
+    setRetryingSeed(true);
+    try {
+      const report = await retrySeedDefaultAgents(createdTeamId);
+      if (report.failed > 0) {
+        setStatus("Retry completed, but some default agents still failed to seed. Open the team editor and add agents manually if needed.");
+        return;
+      }
+      router.push(`/teams/${createdTeamId}`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not retry default agent seeding");
+    } finally {
+      setRetryingSeed(false);
     }
   };
 
@@ -67,6 +93,16 @@ export default function NewTeamPage() {
           </button>
         </div>
         {status ? <p className="status-message">{status}</p> : null}
+        {createdTeamId ? (
+          <div className="button-row">
+            <button type="button" disabled={retryingSeed} onClick={() => void onRetrySeeding()}>
+              {retryingSeed ? "Retrying..." : "Retry default seeding"}
+            </button>
+            <button type="button" onClick={() => router.push(`/teams/${createdTeamId}`)}>
+              Continue to team editor
+            </button>
+          </div>
+        ) : null}
       </AppShell>
     </ProtectedPage>
   );

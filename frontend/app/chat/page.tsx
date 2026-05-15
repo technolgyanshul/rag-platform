@@ -224,7 +224,13 @@ export default function ChatPage() {
             </div>
             <div className="card">
               <h3 style={{ marginBottom: 12 }}>Agent Trace</h3>
-              <TracePanel traces={response?.traces ?? []} sources={response?.sources ?? []} />
+              <TracePanel
+                traces={response?.traces ?? []}
+                sources={response?.sources ?? []}
+                retrievalCount={response?.retrieval_count}
+                insufficientContext={response?.insufficient_context}
+                fullOutput
+              />
             </div>
           </div>
         </div>
